@@ -1,236 +1,135 @@
-from flask import Flask, render_template, jsonify, request
-import yfinance as yf
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from flask import Flask, render_template, jsonify, request, flash, redirect, url_for
+from flask_login import LoginManager, login_required, current_user
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from config import config
+from models import db, User
+from services.auth import auth_bp
+from services.portfolio import PortfolioService
+from services.technical_analysis import TechnicalAnalysisService
+from services.education import EducationService
+from services.export import ExportService
 import logging
 import os
-import json
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+# Initialize Flask app
 app = Flask(__name__)
 
-# Load supported symbols from a JSON file
-SYMBOLS_FILE = 'supported_symbols.json'
+# Load configuration
+env = os.environ.get('FLASK_ENV', 'development')
+app.config.from_object(config[env])
 
-def load_symbols():
-    try:
-        if os.path.exists(SYMBOLS_FILE):
-            with open(SYMBOLS_FILE, 'r') as f:
-                return json.load(f)
-        return ['AAPL', 'GOOGL', 'MSFT', 'META', 'NVDA']
-    except Exception as e:
-        logger.error(f"Error loading symbols: {str(e)}")
-        return ['AAPL', 'GOOGL', 'MSFT', 'META', 'NVDA']
+# Initialize extensions
+db.init_app(app)
+migrate = Migrate(app, db)
 
-def save_symbols(symbols):
-    try:
-        with open(SYMBOLS_FILE, 'w') as f:
-            json.dump(symbols, f)
-    except Exception as e:
-        logger.error(f"Error saving symbols: {str(e)}")
+# Initialize Login Manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'
 
-# List of supported stock symbols
-SUPPORTED_SYMBOLS = load_symbols()
+@login_manager.user_loader
+def load_user(id):
+    return User.query.get(int(id))
 
-def fetch_stock_data(symbol, period='1y'):
-    """Fetch stock data from Yahoo Finance"""
-    try:
-        stock = yf.Ticker(symbol)
-        df = stock.history(period=period)
-        return df
-    except Exception as e:
-        logger.error(f"Error fetching data for {symbol}: {str(e)}")
-        return None
+# Register blueprints
+app.register_blueprint(auth_bp)
 
-def calculate_indicators(df):
-    """Calculate technical indicators"""
-    try:
-        if df is None or len(df) == 0:
-            return None
-            
-        # Calculate SMA
-        df['SMA20'] = df['Close'].rolling(window=20).mean()
-        df['SMA50'] = df['Close'].rolling(window=50).mean()
-        
-        # Calculate RSI
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        df['RSI'] = 100 - (100 / (1 + rs))
-        
-        # Calculate Bollinger Bands
-        rolling_mean = df['Close'].rolling(window=20).mean()
-        rolling_std = df['Close'].rolling(window=20).std()
-        df['Upper Band'] = rolling_mean + (rolling_std * 2)
-        df['Lower Band'] = rolling_mean - (rolling_std * 2)
-        
-        return df
-    except Exception as e:
-        logger.error(f"Error calculating indicators: {str(e)}")
-        return None
+# Initialize services
+portfolio_service = PortfolioService()
+technical_service = TechnicalAnalysisService()
+education_service = EducationService()
+export_service = ExportService()
 
-def predict_price(prices, period):
-    """Predict future price based on period"""
-    try:
-        # Convert period to number of days
-        period_map = {
-            '1d': 1,
-            '3d': 3,
-            '1w': 7,
-            '1m': 30,
-            '3m': 90,
-            '6m': 180,
-            '1y': 365,
-            '5y': 1825
-        }
-        days = period_map.get(period, 1)
-        
-        # Get recent price changes
-        price_changes = prices.pct_change().dropna()
-        
-        # Calculate volatility
-        volatility = price_changes.std()
-        
-        # Calculate trend
-        trend = price_changes.mean()
-        
-        # Simple prediction using trend and volatility
-        current_price = prices.iloc[-1]
-        predicted_change = trend * days
-        prediction = current_price * (1 + predicted_change)
-        
-        # Add some randomness based on volatility
-        prediction *= (1 + np.random.normal(0, volatility))
-        
-        # Prepare prediction factors
-        factors = [
-            f"Historical price trend: {'Upward' if trend > 0 else 'Downward'}",
-            f"Market volatility: {volatility:.2%}",
-            f"Recent price momentum",
-            f"Historical price patterns"
-        ]
-        
-        return prediction, "Time Series Analysis", factors
-        
-    except Exception as e:
-        logger.error(f"Error in prediction: {str(e)}")
-        return prices.iloc[-1], "Simple Moving Average", ["Limited historical data"]
-
+# Routes
 @app.route('/')
 def index():
-    """Render the main page"""
-    return render_template('index.html', symbols=SUPPORTED_SYMBOLS)
+    return render_template('index.html')
+
+@app.route('/api/stock/<symbol>')
+def get_stock_data(symbol):
+    try:
+        data = technical_service.get_stock_data(symbol)
+        if not data:
+            return jsonify({'error': 'Failed to fetch stock data'}), 400
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/predict/<symbol>')
+def predict_stock(symbol):
+    try:
+        predictions = technical_service.predict_price(symbol)
+        return jsonify(predictions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/portfolio', methods=['GET'])
+@login_required
+def get_portfolio():
+    try:
+        portfolio_data = portfolio_service.get_portfolio_value(current_user.id)
+        return jsonify(portfolio_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/portfolio/add', methods=['POST'])
+@login_required
+def add_to_portfolio():
+    try:
+        data = request.json
+        success, result = portfolio_service.add_position(
+            current_user.id,
+            data['symbol'],
+            data['shares'],
+            data['entry_price']
+        )
+        if success:
+            return jsonify({'message': 'Position added successfully'})
+        return jsonify({'error': result}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/education/indicator/<name>')
+def get_indicator_info(name):
+    try:
+        info = education_service.get_indicator_info(name)
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/export/portfolio', methods=['POST'])
+@login_required
+def export_portfolio():
+    try:
+        format_type = request.json.get('format', 'pdf')
+        portfolio_data = portfolio_service.get_portfolio_value(current_user.id)
+        
+        if format_type == 'pdf':
+            success, buffer = export_service.generate_portfolio_report(portfolio_data, current_user)
+        else:
+            success, buffer = export_service.export_to_csv(portfolio_data, 'portfolio.csv')
+            
+        if not success:
+            return jsonify({'error': 'Failed to generate report'}), 500
+            
+        return buffer
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/health')
 def health():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy"}), 200
+    return jsonify({'status': 'healthy'})
 
-@app.route('/api/add_stock', methods=['POST'])
-def add_stock():
-    """Add a new stock symbol"""
-    try:
-        data = request.get_json()
-        symbol = data.get('symbol', '').upper()
-        
-        if not symbol:
-            return jsonify({'success': False, 'error': 'No symbol provided'}), 400
-            
-        if symbol in SUPPORTED_SYMBOLS:
-            return jsonify({'success': False, 'error': 'Symbol already exists'}), 400
-        
-        # Verify the symbol exists
-        stock = yf.Ticker(symbol)
-        info = stock.info
-        
-        if not info or 'regularMarketPrice' not in info:
-            return jsonify({'success': False, 'error': 'Invalid symbol'}), 400
-        
-        # Add to supported symbols
-        SUPPORTED_SYMBOLS.append(symbol)
-        save_symbols(SUPPORTED_SYMBOLS)
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Error adding stock: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('404.html'), 404
 
-@app.route('/api/history/<symbol>')
-def get_history(symbol):
-    """Get historical data and technical indicators for a symbol"""
-    try:
-        # Validate symbol
-        symbol = symbol.upper()
-        if symbol not in SUPPORTED_SYMBOLS:
-            return jsonify({'error': 'Invalid symbol'}), 400
-        
-        # Fetch historical data
-        stock_data = fetch_stock_data(symbol)
-        if stock_data is None:
-            return jsonify({'error': 'Failed to fetch stock data'}), 500
-        
-        # Calculate technical indicators
-        stock_data = calculate_indicators(stock_data)
-        if stock_data is None:
-            return jsonify({'error': 'Failed to calculate indicators'}), 500
-        
-        # Prepare response data
-        response = {
-            'dates': stock_data.index.strftime('%Y-%m-%d').tolist(),
-            'prices': stock_data['Close'].tolist(),
-            'technical_indicators': {
-                'sma20': stock_data['SMA20'].fillna(0).tolist(),
-                'sma50': stock_data['SMA50'].fillna(0).tolist(),
-                'rsi': stock_data['RSI'].fillna(0).tolist(),
-                'upper_band': stock_data['Upper Band'].fillna(0).tolist(),
-                'lower_band': stock_data['Lower Band'].fillna(0).tolist()
-            }
-        }
-        
-        return jsonify(response)
-    except Exception as e:
-        logger.error(f"Error in get_history: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-@app.route('/api/predict/<symbol>')
-def predict_price_endpoint(symbol):
-    """Get price prediction for a symbol"""
-    try:
-        # Validate symbol
-        symbol = symbol.upper()
-        if symbol not in SUPPORTED_SYMBOLS:
-            return jsonify({'error': 'Invalid symbol'}), 400
-        
-        # Get prediction period
-        period = request.args.get('period', '1d')
-        
-        # Fetch historical data
-        stock_data = fetch_stock_data(symbol, period='1y')
-        if stock_data is None:
-            return jsonify({'error': 'Failed to fetch stock data'}), 500
-        
-        # Get the current price
-        current_price = stock_data['Close'].iloc[-1]
-        
-        # Get prediction
-        prediction, method, factors = predict_price(stock_data['Close'], period)
-        
-        response = {
-            'current_price': float(current_price),
-            'prediction': float(prediction),
-            'method': method,
-            'factors': factors,
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        return jsonify(response)
-    except Exception as e:
-        logger.error(f"Error in predict_price: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('500.html'), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
