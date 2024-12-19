@@ -28,6 +28,9 @@ def fetch_stock_data(symbol, period='1y'):
 def calculate_indicators(df):
     """Calculate technical indicators"""
     try:
+        if df is None or len(df) == 0:
+            return None
+            
         # Calculate SMA
         df['SMA20'] = ta.trend.sma_indicator(df['Close'], window=20)
         df['SMA50'] = ta.trend.sma_indicator(df['Close'], window=50)
@@ -44,6 +47,12 @@ def calculate_indicators(df):
         logger.error(f"Error calculating indicators: {str(e)}")
         return None
 
+def simple_moving_average_prediction(prices, window=5):
+    """Simple prediction using moving average"""
+    if len(prices) < window:
+        return prices[-1]
+    return np.mean(prices[-window:])
+
 @app.route('/')
 def index():
     """Render the main page"""
@@ -51,7 +60,7 @@ def index():
 
 @app.route('/health')
 def health():
-    """Health check endpoint for Render"""
+    """Health check endpoint"""
     return jsonify({"status": "healthy"}), 200
 
 @app.route('/api/history/<symbol>')
@@ -108,10 +117,9 @@ def predict_price(symbol):
         # Get the current price
         current_price = stock_data['Close'].iloc[-1]
         
-        # Simple prediction using last 5 days average change
-        last_5_days = stock_data['Close'].tail(5)
-        avg_change = (last_5_days.pct_change() + 1).mean()
-        prediction = current_price * avg_change
+        # Simple prediction using moving average
+        prices = stock_data['Close'].values
+        prediction = simple_moving_average_prediction(prices)
         
         response = {
             'current_price': float(current_price),

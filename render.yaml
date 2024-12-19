@@ -2,18 +2,13 @@ services:
   - type: web
     name: itguess
     env: python
-    buildCommand: |
-      python -m pip install --upgrade pip
-      pip install setuptools wheel
-      pip install --no-cache-dir -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.8.12
       - key: PYTHONPATH
         value: .
-      - key: PIP_NO_BINARY
-        value: ""
     plan: free
     branch: main
     healthCheckPath: /
