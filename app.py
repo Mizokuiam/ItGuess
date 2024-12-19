@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify, request, flash, redirect, url_for
-from flask_login import LoginManager, login_required, current_user
+from flask_login import LoginManager, login_required, current_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from config import config
@@ -49,15 +49,18 @@ portfolio_service = PortfolioService()
 education_service = EducationService()
 export_service = ExportService()
 
+# Routes
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/portfolio')
+@login_required
 def portfolio():
     return render_template('portfolio.html')
 
 @app.route('/watchlist')
+@login_required
 def watchlist():
     return render_template('watchlist.html')
 
@@ -210,6 +213,31 @@ def export_portfolio():
 @app.route('/health')
 def health():
     return jsonify({'status': 'healthy'})
+
+# Auth routes
+@app.route('/login')
+def login():
+    return render_template('auth/login.html')
+
+@app.route('/register')
+def register():
+    return render_template('auth/register.html')
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('auth/profile.html')
+
+@app.route('/change-password')
+@login_required
+def change_password():
+    return render_template('auth/change_password.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
 
 # Error handlers
 @app.errorhandler(404)
