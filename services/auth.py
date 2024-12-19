@@ -2,11 +2,14 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import User, db
+from forms import LoginForm, RegistrationForm
 
 # Create Blueprint
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 login_manager = LoginManager()
+login_manager.login_view = 'auth.login'
+login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -17,52 +20,51 @@ def load_user(user_id):
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-        
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        remember = request.form.get('remember_me')
-        
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user, remember=bool(remember))
-            next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
-        flash('Invalid username or password', 'error')
     
-    return render_template('auth/login.html')
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user and check_password_hash(user.password_hash, form.password.data):
+            login_user(user, remember=form.remember_me.data)
+            next_page = request.args.get('next')
+            if not next_page or not next_page.startswith('/'):
+                next_page = url_for('index')
+            return redirect(next_page)
+        flash('Invalid username or password', 'error')
+    return render_template('auth/login.html', form=form)
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-        
-    if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        if User.query.filter_by(username=username).first():
+    
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        if User.query.filter_by(username=form.username.data).first():
             flash('Username already exists', 'error')
-            return render_template('auth/register.html')
-            
-        if User.query.filter_by(email=email).first():
+            return render_template('auth/register.html', form=form)
+        
+        if User.query.filter_by(email=form.email.data).first():
             flash('Email already registered', 'error')
-            return render_template('auth/register.html')
-            
+            return render_template('auth/register.html', form=form)
+        
         user = User(
-            username=username,
-            email=email,
-            password_hash=generate_password_hash(password)
+            username=form.username.data,
+            email=form.email.data,
+            password_hash=generate_password_hash(form.password.data)
         )
         
-        db.session.add(user)
-        db.session.commit()
-        
-        flash('Registration successful! Please login.', 'success')
-        return redirect(url_for('auth.login'))
-        
-    return render_template('auth/register.html')
+        try:
+            db.session.add(user)
+            db.session.commit()
+            flash('Registration successful! Please login.', 'success')
+            return redirect(url_for('auth.login'))
+        except Exception as e:
+            db.session.rollback()
+            flash('Registration failed. Please try again.', 'error')
+            return render_template('auth/register.html', form=form)
+    
+    return render_template('auth/register.html', form=form)
 
 @auth_bp.route('/logout')
 @login_required
@@ -85,13 +87,13 @@ def change_password():
         if not check_password_hash(current_user.password_hash, current_password):
             flash('Current password is incorrect', 'error')
             return render_template('auth/change_password.html')
-            
+        
         current_user.password_hash = generate_password_hash(new_password)
         db.session.commit()
         
         flash('Password updated successfully', 'success')
         return redirect(url_for('auth.profile'))
-        
+    
     return render_template('auth/change_password.html')
 
 # Service class for additional authentication functionality

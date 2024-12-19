@@ -19,8 +19,15 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 
 # Load configuration
-env = os.environ.get('FLASK_ENV', 'development')
+env = os.environ.get('FLASK_ENV', 'production')  # Default to production
 app.config.from_object(config[env])
+
+# Set secret key
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -34,10 +41,19 @@ migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
+login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# Create database tables
+with app.app_context():
+    try:
+        db.create_all()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {str(e)}")
 
 # Register blueprints
 app.register_blueprint(auth_bp)
