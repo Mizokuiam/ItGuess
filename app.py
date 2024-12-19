@@ -12,6 +12,8 @@ from services.export import ExportService
 from services.prediction import PredictionService
 import logging
 import os
+import yfinance as yf
+from datetime import datetime, timedelta
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -41,6 +43,8 @@ def load_user(user_id):
 app.register_blueprint(auth_bp)
 
 # Initialize services
+technical_analysis = TechnicalAnalysisService()
+prediction_service = PredictionService()
 portfolio_service = PortfolioService()
 education_service = EducationService()
 export_service = ExportService()
@@ -50,39 +54,54 @@ def index():
     return render_template('index.html')
 
 @app.route('/api/stock/<symbol>')
-@login_required
 def get_stock_data(symbol):
     try:
-        analysis_service = TechnicalAnalysisService(symbol=symbol)
-        data = analysis_service.calculate_all_indicators()
-        if data is None:
-            return jsonify({'error': 'Unable to fetch stock data'}), 400
-            
-        summary = analysis_service.get_summary()
-        return jsonify(summary)
+        period = request.args.get('period', '1d')
+        
+        # Get stock data from Yahoo Finance
+        stock = yf.Ticker(symbol)
+        history = stock.history(period='1y')
+        
+        # Calculate technical indicators
+        indicators = technical_analysis.calculate_indicators(history)
+        
+        # Get prediction
+        prediction = prediction_service.predict_price(symbol, period)
+        
+        return jsonify({
+            'history': [{
+                'date': index.strftime('%Y-%m-%d'),
+                'close': row['Close']
+            } for index, row in history.iterrows()],
+            'current_price': history['Close'][-1],
+            'previous_close': history['Close'][-2],
+            'indicators': indicators,
+            'prediction': prediction
+        })
+        
     except Exception as e:
-        logger.error(f"Error getting stock data: {str(e)}")
+        logger.error(f"Error fetching stock data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/indicators/<symbol>')
+def get_indicators(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        history = stock.history(period='1y')
+        indicators = technical_analysis.calculate_indicators(history)
+        return jsonify(indicators)
+    except Exception as e:
+        logger.error(f"Error calculating indicators: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/predict/<symbol>')
-@login_required
 def predict_stock(symbol):
     try:
-        analysis_service = TechnicalAnalysisService(symbol=symbol)
-        data = analysis_service.calculate_all_indicators()
-        if data is None:
-            return jsonify({'error': 'Unable to fetch stock data'}), 400
-            
-        prediction_service = PredictionService(data)
-        prediction = prediction_service.make_prediction()
-        factors = prediction_service.get_prediction_factors()
-        
-        return jsonify({
-            'prediction': prediction,
-            'factors': factors
-        })
+        period = request.args.get('period', '1d')
+        prediction = prediction_service.predict_price(symbol, period)
+        return jsonify(prediction)
     except Exception as e:
-        logger.error(f"Error predicting stock: {str(e)}")
+        logger.error(f"Error making prediction: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/portfolio')
@@ -92,7 +111,7 @@ def get_portfolio():
         portfolio = portfolio_service.get_portfolio(current_user.id)
         return jsonify(portfolio)
     except Exception as e:
-        logger.error(f"Error getting portfolio: {str(e)}")
+        logger.error(f"Error fetching portfolio: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/portfolio/add', methods=['POST'])
@@ -101,20 +120,22 @@ def add_to_portfolio():
     try:
         data = request.get_json()
         symbol = data.get('symbol')
-        shares = data.get('shares')
-        price = data.get('price')
+        shares = data.get('shares', 1)
         
-        if not all([symbol, shares, price]):
-            return jsonify({'error': 'Missing required fields'}), 400
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
             
-        result = portfolio_service.add_position(
-            user_id=current_user.id,
-            symbol=symbol,
-            shares=shares,
-            price=price
-        )
+        # Verify stock exists
+        try:
+            stock = yf.Ticker(symbol)
+            info = stock.info
+        except:
+            return jsonify({'error': 'Invalid stock symbol'}), 400
+            
+        # Add to portfolio
+        portfolio_service.add_stock(current_user.id, symbol, shares)
+        return jsonify({'success': True})
         
-        return jsonify(result)
     except Exception as e:
         logger.error(f"Error adding to portfolio: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -125,7 +146,7 @@ def get_indicator_info(name):
         info = education_service.get_indicator_info(name)
         return jsonify(info)
     except Exception as e:
-        logger.error(f"Error getting indicator info: {str(e)}")
+        logger.error(f"Error fetching indicator info: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/export/portfolio')
@@ -133,19 +154,15 @@ def get_indicator_info(name):
 def export_portfolio():
     try:
         format_type = request.args.get('format', 'csv')
-        if format_type not in ['csv', 'pdf']:
-            return jsonify({'error': 'Invalid export format'}), 400
-            
-        portfolio = portfolio_service.get_portfolio(current_user.id)
-        if format_type == 'csv':
-            file_path = export_service.export_to_csv(portfolio)
+        data = portfolio_service.get_portfolio(current_user.id)
+        
+        if format_type == 'pdf':
+            return export_service.export_pdf(data)
+        elif format_type == 'excel':
+            return export_service.export_excel(data)
         else:
-            file_path = export_service.export_to_pdf(portfolio)
+            return export_service.export_csv(data)
             
-        return jsonify({
-            'success': True,
-            'file_path': file_path
-        })
     except Exception as e:
         logger.error(f"Error exporting portfolio: {str(e)}")
         return jsonify({'error': str(e)}), 500

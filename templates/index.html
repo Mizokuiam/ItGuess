@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ItGuess - Stock Price Predictor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .indicator-card {
             margin-bottom: 15px;
@@ -14,12 +16,8 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
-        .price-up {
-            color: #28a745;
-        }
-        .price-down {
-            color: #dc3545;
-        }
+        .price-up { color: #28a745; }
+        .price-down { color: #dc3545; }
         #loadingOverlay {
             display: none;
             position: fixed;
@@ -32,11 +30,13 @@
             justify-content: center;
             align-items: center;
         }
-        .prediction-info {
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            padding: 15px;
-            margin-top: 15px;
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        .select2-container {
+            width: 100% !important;
         }
     </style>
 </head>
@@ -48,12 +48,34 @@
         </div>
     </div>
 
+    <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand" href="#">ItGuess</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#portfolioModal">Portfolio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#watchlistModal">Watchlist</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#educationModal">Education</a>
+                    </li>
+                </ul>
+                <div class="form-check form-switch me-3">
+                    <input class="form-check-input" type="checkbox" id="darkModeToggle">
+                    <label class="form-check-label text-light" for="darkModeToggle">Dark Mode</label>
+                </div>
+            </div>
         </div>
     </nav>
 
+    <!-- Main Content -->
     <div class="container mt-4">
         <div class="row">
             <div class="col-md-12">
@@ -69,29 +91,31 @@
                             <div class="col-md-6">
                                 <label for="stockSelect">Select Stock:</label>
                                 <select class="form-control" id="stockSelect">
-                                    {% for symbol in symbols %}
-                                    <option value="{{ symbol }}">{{ symbol }}</option>
-                                    {% endfor %}
+                                    <option value="">Select a stock...</option>
+                                    <option value="AAPL">Apple Inc. (AAPL)</option>
+                                    <option value="MSFT">Microsoft Corporation (MSFT)</option>
+                                    <option value="GOOGL">Alphabet Inc. (GOOGL)</option>
+                                    <option value="AMZN">Amazon.com Inc. (AMZN)</option>
+                                    <option value="META">Meta Platforms Inc. (META)</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label for="predictionPeriod">Prediction Period:</label>
                                 <select class="form-control" id="predictionPeriod">
                                     <option value="1d">1 Day</option>
-                                    <option value="3d">3 Days</option>
                                     <option value="1w">1 Week</option>
                                     <option value="1m">1 Month</option>
-                                    <option value="3m">3 Months</option>
-                                    <option value="6m">6 Months</option>
-                                    <option value="1y">1 Year</option>
-                                    <option value="5y">5 Years</option>
                                 </select>
                             </div>
                         </div>
                         
-                        <div id="stockChart" style="height: 500px;"></div>
+                        <!-- Chart Container -->
+                        <div class="chart-container">
+                            <canvas id="priceChart"></canvas>
+                        </div>
                         
-                        <div class="row mt-4">
+                        <!-- Price Information -->
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="card">
                                     <div class="card-header">
@@ -99,6 +123,7 @@
                                     </div>
                                     <div class="card-body">
                                         <h3 id="currentPrice">-</h3>
+                                        <p id="priceChange" class="mb-0">Change: <span>-</span></p>
                                     </div>
                                 </div>
                             </div>
@@ -109,44 +134,18 @@
                                     </div>
                                     <div class="card-body">
                                         <h3 id="predictedPrice">-</h3>
-                                        <div class="prediction-info">
-                                            <h6>Prediction Method:</h6>
-                                            <p id="predictionMethod" class="mb-2">-</p>
-                                            <h6>Based on:</h6>
-                                            <ul id="predictionFactors" class="mb-0">
-                                            </ul>
-                                        </div>
+                                        <p id="predictionConfidence" class="mb-0">Confidence: <span>-</span></p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="mt-4">
-                            <h5>Technical Indicators</h5>
-                            <div class="row" id="technicalIndicators">
-                                <div class="col-md-4">
-                                    <div class="card indicator-card">
-                                        <div class="card-body">
-                                            <h6>RSI (14)</h6>
-                                            <p id="rsiValue" class="mb-0">-</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card indicator-card">
-                                        <div class="card-body">
-                                            <h6>SMA 20</h6>
-                                            <p id="sma20Value" class="mb-0">-</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card indicator-card">
-                                        <div class="card-body">
-                                            <h6>SMA 50</h6>
-                                            <p id="sma50Value" class="mb-0">-</p>
-                                        </div>
-                                    </div>
+                        <!-- Technical Indicators -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6>Technical Indicators</h6>
+                                <div id="technicalIndicators" class="row">
+                                    <!-- Indicators will be populated here -->
                                 </div>
                             </div>
                         </div>
@@ -157,7 +156,7 @@
     </div>
 
     <!-- Add Stock Modal -->
-    <div class="modal fade" id="addStockModal" tabindex="-1">
+    <div class="modal fade" id="addStockModal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -165,31 +164,24 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addStockForm">
-                        <div class="mb-3">
-                            <label for="stockSymbol" class="form-label">Stock Symbol</label>
-                            <input type="text" class="form-control" id="stockSymbol" required>
-                            <div class="form-text">Enter the stock symbol (e.g., AAPL, GOOGL)</div>
-                        </div>
-                    </form>
+                    <div class="mb-3">
+                        <label for="stockSymbol" class="form-label">Stock Symbol</label>
+                        <input type="text" class="form-control" id="stockSymbol" placeholder="e.g., AAPL">
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="addStockButton">Add Stock</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="footer mt-4 py-3 bg-light">
-        <div class="container text-center">
-            <span class="text-muted">Disclaimer: This tool is for educational purposes only. Do not use it as financial advice.</span>
-        </div>
-    </footer>
-
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
