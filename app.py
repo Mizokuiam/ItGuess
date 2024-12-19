@@ -44,7 +44,7 @@ app.register_blueprint(auth_bp)
 
 # Initialize services
 technical_analysis = TechnicalAnalysisService()
-prediction_service = PredictionService()
+prediction_service = PredictionService()  # Now works without data
 portfolio_service = PortfolioService()
 education_service = EducationService()
 export_service = ExportService()
@@ -56,31 +56,71 @@ def index():
 @app.route('/api/stock/<symbol>')
 def get_stock_data(symbol):
     try:
-        period = request.args.get('period', '1d')
-        
-        # Get stock data from Yahoo Finance
         stock = yf.Ticker(symbol)
-        history = stock.history(period='1y')
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
         
+        # Get historical data
+        df = stock.history(start=start_date, end=end_date)
+        
+        if df.empty:
+            return jsonify({'error': 'No data available for this stock'}), 404
+            
         # Calculate technical indicators
-        indicators = technical_analysis.calculate_indicators(history)
+        indicators = technical_analysis.calculate_indicators(df)
+        df = df.join(indicators)
         
-        # Get prediction
-        prediction = prediction_service.predict_price(symbol, period)
+        # Format the data for response
+        data = {
+            'dates': df.index.strftime('%Y-%m-%d').tolist(),
+            'prices': df['Close'].tolist(),
+            'volumes': df['Volume'].tolist(),
+            'indicators': {
+                'RSI': df['RSI'].tolist() if 'RSI' in df.columns else [],
+                'MACD': df['MACD'].tolist() if 'MACD' in df.columns else [],
+                'Signal': df['Signal'].tolist() if 'Signal' in df.columns else [],
+                'K': df['%K'].tolist() if '%K' in df.columns else [],
+                'D': df['%D'].tolist() if '%D' in df.columns else []
+            }
+        }
         
-        return jsonify({
-            'history': [{
-                'date': index.strftime('%Y-%m-%d'),
-                'close': row['Close']
-            } for index, row in history.iterrows()],
-            'current_price': history['Close'][-1],
-            'previous_close': history['Close'][-2],
-            'indicators': indicators,
-            'prediction': prediction
-        })
-        
+        return jsonify(data)
     except Exception as e:
         logger.error(f"Error fetching stock data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/predict/<symbol>')
+def predict_stock(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
+        
+        # Get historical data
+        df = stock.history(start=start_date, end=end_date)
+        
+        if df.empty:
+            return jsonify({'error': 'No data available for this stock'}), 404
+            
+        # Calculate technical indicators
+        indicators = technical_analysis.calculate_indicators(df)
+        df = df.join(indicators)
+        
+        # Set data for prediction
+        prediction_service.set_data(df)
+        
+        # Make prediction
+        predicted_price = prediction_service.make_prediction()
+        
+        return jsonify({
+            'predicted_price': predicted_price,
+            'current_price': df['Close'].iloc[-1],
+            'prediction_date': datetime.now().strftime('%Y-%m-%d')
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error making prediction: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/indicators/<symbol>')
@@ -92,16 +132,6 @@ def get_indicators(symbol):
         return jsonify(indicators)
     except Exception as e:
         logger.error(f"Error calculating indicators: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/predict/<symbol>')
-def predict_stock(symbol):
-    try:
-        period = request.args.get('period', '1d')
-        prediction = prediction_service.predict_price(symbol, period)
-        return jsonify(prediction)
-    except Exception as e:
-        logger.error(f"Error making prediction: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/portfolio')

@@ -224,3 +224,37 @@ function updateChartTheme(isDark) {
     
     chartInstance.update();
 }
+
+function getPrediction(symbol) {
+    showLoading('prediction');
+    fetch(`/api/predict/${symbol}`)
+        .then(response => response.json())
+        .then(data => {
+            hideLoading('prediction');
+            if (data.error) {
+                showError('prediction', data.error);
+                return;
+            }
+            
+            const predictionCard = document.getElementById('prediction-card');
+            const currentPrice = parseFloat(data.current_price).toFixed(2);
+            const predictedPrice = parseFloat(data.predicted_price).toFixed(2);
+            const change = ((predictedPrice - currentPrice) / currentPrice * 100).toFixed(2);
+            const direction = change >= 0 ? 'up' : 'down';
+            
+            predictionCard.innerHTML = `
+                <div class="card-body">
+                    <h5 class="card-title">Price Prediction</h5>
+                    <p class="card-text">Current Price: $${currentPrice}</p>
+                    <p class="card-text">Predicted Price: $${predictedPrice}</p>
+                    <p class="card-text ${direction}">Expected Change: ${change}%</p>
+                    <p class="card-text"><small class="text-muted">Prediction Date: ${data.prediction_date}</small></p>
+                </div>
+            `;
+        })
+        .catch(error => {
+            hideLoading('prediction');
+            showError('prediction', 'Failed to get prediction');
+            console.error('Error:', error);
+        });
+}

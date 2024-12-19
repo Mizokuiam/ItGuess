@@ -3,13 +3,20 @@ from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 
 class PredictionService:
-    def __init__(self, data):
+    def __init__(self, data=None):
         self.data = data
         self.scaler = MinMaxScaler()
         self.model = None
         
+    def set_data(self, data):
+        """Set data for prediction"""
+        self.data = data
+        
     def prepare_data(self, window_size=60):
         """Prepare data for prediction"""
+        if self.data is None:
+            raise ValueError("Data must be set before preparing")
+            
         # Prepare features
         features = ['Close', 'Volume', 'RSI', 'MACD', '%K', '%D']
         X = self.data[features].values
@@ -28,6 +35,9 @@ class PredictionService:
         
     def train_model(self):
         """Train the prediction model"""
+        if self.data is None:
+            raise ValueError("Data must be set before training")
+            
         X, y = self.prepare_data()
         
         # Split data
@@ -43,6 +53,9 @@ class PredictionService:
         
     def make_prediction(self, period='1d'):
         """Make price prediction"""
+        if self.data is None:
+            raise ValueError("Data must be set before making predictions")
+            
         if self.model is None:
             self.train_model()
             
@@ -50,20 +63,6 @@ class PredictionService:
         X_last = self.prepare_data()[0][-1:]
         
         # Make prediction
-        prediction = self.model.predict(X_last.reshape(1, -1))[0]
+        prediction = self.model.predict(X_last.reshape(1, -1))
         
-        return {
-            'predicted_price': prediction,
-            'confidence': self.model.score(X_last.reshape(1, -1), [self.data['Close'].iloc[-1]]),
-            'period': period
-        }
-        
-    def get_prediction_factors(self):
-        """Get factors affecting the prediction"""
-        if self.model is None:
-            return None
-            
-        features = ['Close', 'Volume', 'RSI', 'MACD', '%K', '%D']
-        importance = self.model.feature_importances_
-        
-        return dict(zip(features, importance))
+        return float(prediction[0])
