@@ -1,74 +1,7 @@
-/* Global Styles */
-:root {
-    --primary-color: #2196F3;
-    --secondary-color: #607D8B;
-    --success-color: #4CAF50;
-    --danger-color: #F44336;
-    --warning-color: #FFC107;
-    --info-color: #00BCD4;
-    --dark-bg: #1a1a1a;
-    --dark-card: #2d2d2d;
-    --dark-text: #ffffff;
-    --light-bg: #ffffff;
-    --border-radius: 0.25rem;
-}
-
+/* Basic Styles */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    transition: background-color 0.3s ease;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
     background-color: #f8f9fa;
-}
-
-/* Navigation Styles */
-.navbar {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
-    padding: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.navbar-brand {
-    font-weight: 600;
-    font-size: 1.5rem;
-    color: white !important;
-}
-
-.navbar-nav .nav-link {
-    color: rgba(255,255,255,0.9) !important;
-    font-weight: 500;
-    padding: 0.5rem 1rem;
-    transition: all 0.3s ease;
-}
-
-.navbar-nav .nav-link:hover {
-    color: white !important;
-    transform: translateY(-1px);
-}
-
-.navbar-toggler {
-    border-color: rgba(255,255,255,0.5);
-}
-
-/* Dark Mode Styles */
-body.dark-mode {
-    background-color: var(--dark-bg);
-    color: var(--dark-text);
-}
-
-body.dark-mode .card {
-    background-color: var(--dark-card);
-    border-color: #404040;
-}
-
-body.dark-mode .card-header {
-    border-bottom-color: #404040;
-}
-
-body.dark-mode .modal-content {
-    background-color: var(--dark-card);
-    color: var(--dark-text);
 }
 
 /* Loading Overlay */
@@ -79,57 +12,42 @@ body.dark-mode .modal-content {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.8);
     z-index: 1000;
     justify-content: center;
     align-items: center;
 }
 
-body.dark-mode #loadingOverlay {
-    background: rgba(26, 26, 26, 0.9);
-}
-
-/* Chart Styles */
+/* Chart Container */
 .chart-container {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    margin-bottom: 2rem;
+    position: relative;
+    height: 400px;
+    margin-bottom: 20px;
+    background-color: #fff;
+    border-radius: 4px;
+    padding: 15px;
 }
 
-body.dark-mode .chart-container {
-    background: var(--dark-card);
-}
+/* Price Display */
+.price-up { color: #28a745; }
+.price-down { color: #dc3545; }
 
 /* Card Styles */
 .card {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
 }
 
 .card-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-    font-weight: 500;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
 }
 
 /* Form Styles */
-.form-control {
-    border: 1px solid #dee2e6;
-    padding: 0.75rem;
-}
-
-body.dark-mode .form-control {
-    background-color: #333;
-    border-color: #404040;
-    color: white;
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 /* Select2 Customization */
@@ -138,224 +56,35 @@ body.dark-mode .form-control {
 }
 
 .select2-container--default .select2-selection--single {
-    height: calc(1.5em + 1.5rem) !important;
-    padding: 0.75rem !important;
-    border: 1px solid #dee2e6 !important;
+    height: 38px !important;
+    line-height: 38px !important;
 }
 
-body.dark-mode .select2-container--default .select2-selection--single {
-    background-color: #333;
-    border-color: #404040 !important;
-    color: white;
+/* Dark Mode */
+body.dark-mode {
+    background-color: #212529;
+    color: #fff;
 }
 
-/* Animation */
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+body.dark-mode .card {
+    background-color: #343a40;
+    border-color: #495057;
+}
+
+body.dark-mode .card-header {
+    background-color: #2c3136;
+    border-bottom-color: #495057;
+}
+
+body.dark-mode .form-control {
+    background-color: #343a40;
+    border-color: #495057;
+    color: #fff;
 }
 
 /* Responsive Styles */
 @media (max-width: 768px) {
-    .navbar-nav {
-        background: rgba(0,0,0,0.1);
-        border-radius: var(--border-radius);
-        padding: 0.5rem;
-        margin-top: 1rem;
+    .chart-container {
+        height: 300px;
     }
-    
-    .form-check.form-switch {
-        margin: 1rem 0;
-    }
-}
-
-/* Price Display */
-#currentPrice, #predictedPrice, #priceChange {
-    font-size: 2rem;
-    font-weight: bold;
-    margin: 0;
-    text-align: center;
-}
-
-.price-up {
-    color: var(--success-color);
-    font-weight: bold;
-}
-
-.price-down {
-    color: var(--danger-color);
-    font-weight: bold;
-}
-
-/* Portfolio Section */
-.portfolio-summary {
-    background-color: #f8f9fa;
-    padding: 20px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-}
-
-.position-card {
-    margin-bottom: 15px;
-}
-
-/* Watchlist */
-.watchlist-item {
-    padding: 10px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.watchlist-item:last-child {
-    border-bottom: none;
-}
-
-/* Education Section */
-.education-card {
-    height: 100%;
-}
-
-.education-card .card-body {
-    display: flex;
-    flex-direction: column;
-}
-
-.education-card .card-text {
-    flex-grow: 1;
-}
-
-/* Footer */
-.footer {
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-/* Loading and Error States */
-#loadingIndicator {
-    text-align: center;
-    padding: 1rem;
-}
-
-#errorMessage {
-    text-align: center;
-    margin-bottom: 1rem;
-}
-
-/* Technical Indicators */
-.technical-indicator {
-    padding: 15px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-}
-
-.technical-indicator h6 {
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-#technicalIndicators .card {
-    transition: transform 0.2s;
-}
-
-#technicalIndicators .card:hover {
-    transform: translateY(-2px);
-}
-
-#technicalIndicators h6 {
-    color: #666;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-#technicalIndicators p {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #333;
-    margin: 0;
-}
-
-.indicator-card {
-    margin-bottom: 15px;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.indicator-card .card-body {
-    padding: 15px;
-}
-
-.indicator-value {
-    font-size: 1.2rem;
-    font-weight: bold;
-}
-
-/* Modal Styles */
-.modal-content {
-    border-radius: 10px;
-}
-
-body.dark-mode .modal-content {
-    background-color: var(--dark-card);
-    color: var(--dark-text);
-}
-
-.modal-header {
-    background-color: var(--primary-color);
-    color: white;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-}
-
-.modal-footer {
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* Buttons */
-.btn {
-    border-radius: 5px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 8px 16px;
-    transition: all 0.3s ease;
-}
-
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-}
-
-.btn-primary:hover {
-    background-color: #1976D2;
-    border-color: #1976D2;
-    transform: translateY(-1px);
-}
-
-/* Form Controls */
-.form-control:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
 }

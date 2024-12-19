@@ -5,315 +5,186 @@ let stockChart = null;
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Main.js loaded');
     
-    // Initialize Select2
     $(document).ready(function() {
         // Initialize Select2 for stock selection
         $('#stockSelect').select2({
-            theme: 'bootstrap4',
-            placeholder: 'Select a stock...',
+            placeholder: 'Choose a stock...',
             allowClear: true
         });
 
-        // Initialize Chart
-        const ctx = document.getElementById('stockChart').getContext('2d');
-        stockChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Stock Price',
-                    data: [],
-                    borderColor: '#2196F3',
-                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#2196F3',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: '#666666'
-                        }
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#ffffff',
-                        bodyColor: '#ffffff',
+        // Initialize dark mode based on user preference
+        const darkModeToggle = $('#darkModeToggle');
+        const isDarkMode = localStorage.getItem('darkMode') === 'true';
+        darkModeToggle.prop('checked', isDarkMode);
+        if (isDarkMode) {
+            $('body').addClass('dark-mode');
+        }
+
+        // Dark mode toggle handler
+        darkModeToggle.on('change', function() {
+            const isChecked = $(this).prop('checked');
+            localStorage.setItem('darkMode', isChecked);
+            $('body').toggleClass('dark-mode', isChecked);
+        });
+
+        // Stock chart initialization
+        let stockChart = null;
+        function initializeChart() {
+            const ctx = document.getElementById('stockChart').getContext('2d');
+            stockChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Stock Price',
+                        data: [],
                         borderColor: '#2196F3',
-                        borderWidth: 1
-                    }
+                        tension: 0.1
+                    }]
                 },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Date',
-                            color: '#666666'
-                        },
-                        grid: {
-                            display: true,
-                            color: 'rgba(0, 0, 0, 0.1)'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+        initializeChart();
+
+        // Add stock handler
+        $('#addStockButton').on('click', function() {
+            const symbol = $('#newStockSymbol').val().trim().toUpperCase();
+            if (symbol) {
+                // Show loading overlay
+                $('#loadingOverlay').css('display', 'flex');
+
+                // Make API call to add stock
+                $.ajax({
+                    url: '/api/add_stock',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ symbol: symbol }),
+                    success: function(response) {
+                        if (response.success) {
+                            // Add new option to select
+                            const newOption = new Option(symbol, symbol, true, true);
+                            $('#stockSelect').append(newOption).trigger('change');
+                            
+                            // Close modal and clear input
+                            $('#addStockModal').modal('hide');
+                            $('#newStockSymbol').val('');
+                            
+                            // Load the new stock data
+                            loadStockData(symbol);
+                        } else {
+                            alert('Error adding stock: ' + response.message);
                         }
                     },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Price ($)',
-                            color: '#666666'
-                        },
-                        grid: {
-                            display: true,
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        }
+                    error: function() {
+                        alert('Error adding stock. Please try again.');
+                    },
+                    complete: function() {
+                        $('#loadingOverlay').hide();
                     }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                },
-                animation: {
-                    duration: 1000
-                }
+                });
             }
         });
 
-        // Event Listeners
+        // Stock selection handler
         $('#stockSelect').on('change', function() {
-            const selectedStock = $(this).val();
-            if (selectedStock) {
-                updateStockData(selectedStock);
+            const symbol = $(this).val();
+            if (symbol) {
+                loadStockData(symbol);
             }
         });
 
-        $('#darkModeToggle').on('change', function() {
-            $('body').toggleClass('dark-mode');
-            updateChartTheme();
-        });
-
-        // Form submission
-        $('#addStockForm').on('submit', function(e) {
-            e.preventDefault();
-            const symbol = $('#stockSymbol').val().toUpperCase();
-            addNewStock(symbol);
-        });
-
-        // Initialize tooltips
-        $('[data-bs-toggle="tooltip"]').tooltip();
-    });
-
-    // Update chart theme based on dark mode
-    function updateChartTheme() {
-        const isDarkMode = $('body').hasClass('dark-mode');
-        const textColor = isDarkMode ? '#ffffff' : '#666666';
-        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        
-        stockChart.options.scales.x.ticks.color = textColor;
-        stockChart.options.scales.y.ticks.color = textColor;
-        stockChart.options.scales.x.title.color = textColor;
-        stockChart.options.scales.y.title.color = textColor;
-        stockChart.options.scales.x.grid.color = gridColor;
-        stockChart.options.scales.y.grid.color = gridColor;
-        stockChart.options.plugins.legend.labels.color = textColor;
-        stockChart.update();
-    }
-
-    // Fetch and update stock data
-    async function updateStockData(symbol) {
-        showLoading();
-        try {
-            const response = await fetch(`/api/stock/${symbol}`);
-            const data = await response.json();
-            
-            if (data.success) {
-                updateChart(data.prices, data.dates);
-                updateCurrentPrice(data.current_price, data.previous_close);
-                getPrediction(symbol);
-                updateTechnicalIndicators(data.indicators);
-            } else {
-                showError(data.error || 'Failed to fetch stock data');
+        // Prediction period handler
+        $('#predictionPeriod').on('change', function() {
+            const symbol = $('#stockSelect').val();
+            if (symbol) {
+                loadStockData(symbol);
             }
-        } catch (error) {
-            showError('Error fetching stock data');
-            console.error('Error:', error);
-        } finally {
-            hideLoading();
+        });
+
+        // Load stock data function
+        function loadStockData(symbol) {
+            $('#loadingOverlay').css('display', 'flex');
+            const period = $('#predictionPeriod').val();
+
+            $.ajax({
+                url: '/api/stock_data',
+                method: 'GET',
+                data: { 
+                    symbol: symbol,
+                    period: period
+                },
+                success: function(data) {
+                    updateChart(data.prices);
+                    updatePriceDisplays(data.current, data.predicted);
+                    updateTechnicalIndicators(data.indicators);
+                },
+                error: function() {
+                    alert('Error loading stock data. Please try again.');
+                },
+                complete: function() {
+                    $('#loadingOverlay').hide();
+                }
+            });
         }
-    }
 
-    // Update chart with new data
-    function updateChart(prices, dates) {
-        stockChart.data.labels = dates;
-        stockChart.data.datasets[0].data = prices;
-        stockChart.update();
-    }
-
-    // Update current price display
-    function updateCurrentPrice(currentPrice, previousClose) {
-        const change = ((currentPrice - previousClose) / previousClose * 100).toFixed(2);
-        const direction = change >= 0 ? 'up' : 'down';
-        
-        $('#currentPrice').text(`$${currentPrice}`);
-        $('#priceChange').html(`
-            <i class="fas fa-arrow-${direction}"></i>
-            ${Math.abs(change)}%
-        `).removeClass('text-success text-danger')
-          .addClass(direction === 'up' ? 'text-success' : 'text-danger');
-    }
-
-    // Get and display prediction
-    async function getPrediction(symbol) {
-        try {
-            const response = await fetch(`/api/predict/${symbol}`);
-            const data = await response.json();
-            
-            if (data.success) {
-                updatePredictionDisplay(data);
-            } else {
-                showError(data.error || 'Failed to get prediction');
-            }
-        } catch (error) {
-            showError('Error getting prediction');
-            console.error('Error:', error);
+        // Update chart function
+        function updateChart(prices) {
+            stockChart.data.labels = prices.map(p => p.date);
+            stockChart.data.datasets[0].data = prices.map(p => p.price);
+            stockChart.update();
         }
-    }
 
-    // Update prediction display
-    function updatePredictionDisplay(data) {
-        const currentPrice = parseFloat(data.current_price);
-        const predictedPrice = parseFloat(data.predicted_price);
-        const change = ((predictedPrice - currentPrice) / currentPrice * 100).toFixed(2);
-        const direction = change >= 0 ? 'up' : 'down';
-        
-        $('#predictedPrice').text(`$${predictedPrice}`);
-        $('#predictionChange').html(`
-            <i class="fas fa-arrow-${direction}"></i>
-            ${Math.abs(change)}%
-        `).removeClass('text-success text-danger')
-          .addClass(direction === 'up' ? 'text-success' : 'text-danger');
-        
-        $('#predictionDate').text(`Prediction for: ${data.prediction_date}`);
-        $('#predictionConfidence').text(`Confidence: ${(data.confidence * 100).toFixed(1)}%`);
-    }
+        // Update price displays function
+        function updatePriceDisplays(current, predicted) {
+            $('#currentPrice').text('$' + current.price.toFixed(2));
+            $('#predictedPrice').text('$' + predicted.price.toFixed(2));
+            
+            const priceChange = current.change;
+            const changeText = (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%';
+            $('#priceChange')
+                .text(changeText)
+                .removeClass('price-up price-down')
+                .addClass(priceChange >= 0 ? 'price-up' : 'price-down');
+            
+            $('#confidenceLevel').text('Confidence: ' + predicted.confidence + '%');
+            $('#volume').text(formatNumber(current.volume));
+        }
 
-    // Update technical indicators
-    function updateTechnicalIndicators(data) {
-        const indicators = $('#technicalIndicators');
-        indicators.empty();
-        
-        const indicatorData = [
-            {
-                name: 'RSI',
-                value: data.rsi,
-                icon: 'fa-signal',
-                description: 'Relative Strength Index',
-                type: data.rsi > 70 ? 'danger' : data.rsi < 30 ? 'success' : 'info'
-            },
-            {
-                name: 'MACD',
-                value: data.macd,
-                icon: 'fa-chart-line',
-                description: 'Moving Average Convergence Divergence',
-                type: data.macd > 0 ? 'success' : 'danger'
-            },
-            {
-                name: 'Signal',
-                value: data.signal,
-                icon: 'fa-wave-square',
-                description: 'MACD Signal Line',
-                type: 'info'
-            }
-        ];
-        
-        indicatorData.forEach(indicator => {
-            if (indicator.value !== null) {
-                const card = `
-                    <div class="col-md-4">
-                        <div class="card indicator-card">
-                            <div class="card-body text-center">
-                                <i class="fas ${indicator.icon} mb-2 text-${indicator.type}"></i>
-                                <h5 class="card-title">${indicator.name}</h5>
-                                <p class="indicator-value text-${indicator.type}">${indicator.value}</p>
-                                <small class="text-muted">${indicator.description}</small>
-                            </div>
+        // Update technical indicators function
+        function updateTechnicalIndicators(indicators) {
+            const container = $('#technicalIndicators');
+            container.empty();
+
+            Object.entries(indicators).forEach(([name, value]) => {
+                const card = $('<div>').addClass('col-md-4 mb-3');
+                card.html(`
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">${name}</h6>
+                            <p class="mb-0">${value}</p>
                         </div>
                     </div>
-                `;
-                indicators.append(card);
-            }
-        });
-    }
-
-    // Add new stock to the list
-    async function addNewStock(symbol) {
-        showLoading();
-        try {
-            const response = await fetch('/api/add_stock', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ symbol })
+                `);
+                container.append(card);
             });
-            
-            const data = await response.json();
-            if (data.success) {
-                $('#stockSelect').append(new Option(data.name, symbol, true, true)).trigger('change');
-                $('#addStockModal').modal('hide');
-            } else {
-                showError(data.message || 'Failed to add stock');
-            }
-        } catch (error) {
-            showError('Error adding stock');
-            console.error('Error:', error);
-        } finally {
-            hideLoading();
         }
-    }
 
-    // Loading state management
-    function showLoading() {
-        $('#loadingOverlay').fadeIn(200);
-    }
-
-    function hideLoading() {
-        $('#loadingOverlay').fadeOut(200);
-    }
-
-    // Error handling with toast notifications
-    function showError(message) {
-        const toast = `
-            <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
-                <div class="toast-header bg-danger text-white">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong class="me-auto">Error</strong>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-                </div>
-                <div class="toast-body">
-                    ${message}
-                </div>
-            </div>
-        `;
-        
-        const toastContainer = $('#toastContainer');
-        if (!toastContainer.length) {
-            $('body').append('<div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>');
+        // Utility function to format large numbers
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         }
-        
-        const toastElement = $(toast);
-        $('#toastContainer').append(toastElement);
-        const bsToast = new bootstrap.Toast(toastElement[0]);
-        bsToast.show();
-    }
+    });
 });

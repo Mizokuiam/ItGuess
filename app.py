@@ -53,6 +53,18 @@ export_service = ExportService()
 def index():
     return render_template('index.html')
 
+@app.route('/portfolio')
+def portfolio():
+    return render_template('portfolio.html')
+
+@app.route('/watchlist')
+def watchlist():
+    return render_template('watchlist.html')
+
+@app.route('/education')
+def education():
+    return render_template('education.html')
+
 @app.route('/api/stock/<symbol>')
 def get_stock_data(symbol):
     try:

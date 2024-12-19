@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Education Center</h2>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Technical Analysis Basics</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Common Technical Indicators</h6>
+                    <div class="accordion" id="technicalIndicatorsAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#rsiCollapse">
+                                    Relative Strength Index (RSI)
+                                </button>
+                            </h2>
+                            <div id="rsiCollapse" class="accordion-collapse collapse show" data-bs-parent="#technicalIndicatorsAccordion">
+                                <div class="accordion-body">
+                                    The RSI is a momentum indicator that measures the magnitude of recent price changes to evaluate overbought or oversold conditions. Values above 70 typically indicate overbought conditions, while values below 30 suggest oversold conditions.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#macdCollapse">
+                                    Moving Average Convergence Divergence (MACD)
+                                </button>
+                            </h2>
+                            <div id="macdCollapse" class="accordion-collapse collapse" data-bs-parent="#technicalIndicatorsAccordion">
+                                <div class="accordion-body">
+                                    MACD is a trend-following momentum indicator that shows the relationship between two moving averages of a security's price. The MACD line crossing above the signal line is considered a bullish signal, while crossing below is bearish.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Market Analysis Resources</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item">
+                            <h6>Fundamental Analysis</h6>
+                            <p>Learn how to analyze company financials, market trends, and economic indicators.</p>
+                        </li>
+                        <li class="list-group-item">
+                            <h6>Risk Management</h6>
+                            <p>Understand position sizing, stop-loss orders, and portfolio diversification.</p>
+                        </li>
+                        <li class="list-group-item">
+                            <h6>Market Psychology</h6>
+                            <p>Learn about investor sentiment and how it affects market movements.</p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

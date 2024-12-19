@@ -1,203 +1,97 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ItGuess - AI-Powered Stock Price Predictor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        .indicator-card {
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
-        }
-        .indicator-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .price-up { color: #28a745; }
-        .price-down { color: #dc3545; }
-        #loadingOverlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.8);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .chart-container {
-            position: relative;
-            height: 400px;
-            margin-bottom: 20px;
-        }
-        .select2-container {
-            width: 100% !important;
-        }
-    </style>
-</head>
-<body>
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
+{% extends "base.html" %}
 
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-chart-line me-2"></i>ItGuess
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+{% block content %}
+<div class="container mt-4">
+    <h1 class="text-center mb-4">AI-Powered Stock Price Predictor</h1>
+    <p class="text-center text-muted mb-4">Make informed investment decisions with our advanced machine learning predictions</p>
+
+    <!-- Stock Analysis Section -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Stock Analysis</h5>
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStockModal">
+                Add Stock
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="#portfolio">
-                            <i class="fas fa-briefcase me-1"></i>Portfolio
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#watchlist">
-                            <i class="fas fa-star me-1"></i>Watchlist
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#education">
-                            <i class="fas fa-graduation-cap me-1"></i>Education
-                        </a>
-                    </li>
-                </ul>
-                <div class="d-flex align-items-center">
-                    <div class="form-check form-switch me-3">
-                        <input class="form-check-input" type="checkbox" id="darkModeToggle">
-                        <label class="form-check-label text-light" for="darkModeToggle">
-                            <i class="fas fa-moon"></i>
-                        </label>
-                    </div>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="stockSelect" class="form-label">Select Stock:</label>
+                    <select class="form-select" id="stockSelect">
+                        <option value="">Choose a stock...</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="predictionPeriod" class="form-label">Prediction Period:</label>
+                    <select class="form-select" id="predictionPeriod">
+                        <option value="1d">1 Day</option>
+                        <option value="1w">1 Week</option>
+                        <option value="1m">1 Month</option>
+                    </select>
                 </div>
             </div>
-        </div>
-    </nav>
 
-    <!-- Main Content -->
-    <div class="container mt-4">
-        <!-- Header Section -->
-        <div class="row mb-4">
-            <div class="col-12 text-center">
-                <h1 class="display-4 mb-3">AI-Powered Stock Price Predictor</h1>
-                <p class="lead text-muted">Make informed investment decisions with our advanced machine learning predictions</p>
+            <div class="chart-container mb-4">
+                <canvas id="stockChart"></canvas>
             </div>
-        </div>
 
-        <!-- Stock Analysis Section -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Stock Analysis</h5>
-                        <button class="btn btn-primary btn-sm" id="addStockBtn">
-                            <i class="fas fa-plus me-1"></i>Add Stock
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="stockSelect" class="form-label">Select Stock:</label>
-                                <select class="form-select" id="stockSelect">
-                                    <option value="">Choose a stock...</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="predictionPeriod" class="form-label">Prediction Period:</label>
-                                <select class="form-select" id="predictionPeriod">
-                                    <option value="1d">1 Day</option>
-                                    <option value="1w">1 Week</option>
-                                    <option value="1m">1 Month</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Stock Price Chart -->
-                        <div class="chart-container">
-                            <canvas id="stockChart"></canvas>
-                        </div>
-
-                        <!-- Technical Indicators -->
-                        <div class="row" id="technicalIndicators">
-                            <!-- Indicators will be dynamically added here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Prediction Results -->
-        <div class="row">
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">Current Price</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="text-center">
-                            <h2 id="currentPrice">--</h2>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Current Price</h6>
+                            <h4 id="currentPrice">--</h4>
                             <p id="priceChange" class="mb-0">--</p>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">Predicted Price</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="text-center">
-                            <h2 id="predictedPrice">--</h2>
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Predicted Price</h6>
+                            <h4 id="predictedPrice">--</h4>
                             <p id="confidenceLevel" class="mb-0">--</p>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Stock Modal -->
-    <div class="modal fade" id="addStockModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Stock</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="newStockSymbol" class="form-label">Stock Symbol</label>
-                        <input type="text" class="form-control" id="newStockSymbol" placeholder="Enter stock symbol (e.g., AAPL)">
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Volume</h6>
+                            <h4 id="volume">--</h4>
+                            <p class="mb-0">24h Volume</p>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveNewStock">Add Stock</button>
-                </div>
+            </div>
+
+            <div id="technicalIndicators" class="row mt-3">
+                <!-- Technical indicators will be added here dynamically -->
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+<!-- Add Stock Modal -->
+<div class="modal fade" id="addStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Stock</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="newStockSymbol" class="form-label">Stock Symbol</label>
+                    <input type="text" class="form-control" id="newStockSymbol" placeholder="e.g., AAPL">
+                    <small class="form-text text-muted">Enter the stock symbol (e.g., AAPL for Apple Inc.)</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="addStockButton">Add Stock</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
