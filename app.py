@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
 from datetime import datetime, timedelta
 import logging
 import os
@@ -31,16 +30,21 @@ def calculate_indicators(df):
             return None
             
         # Calculate SMA
-        df['SMA20'] = df.ta.sma(length=20)
-        df['SMA50'] = df.ta.sma(length=50)
+        df['SMA20'] = df['Close'].rolling(window=20).mean()
+        df['SMA50'] = df['Close'].rolling(window=50).mean()
         
         # Calculate RSI
-        df['RSI'] = df.ta.rsi(length=14)
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
         
         # Calculate Bollinger Bands
-        bollinger = df.ta.bbands(length=20)
-        df['Upper Band'] = bollinger['BBU_20_2.0']
-        df['Lower Band'] = bollinger['BBL_20_2.0']
+        rolling_mean = df['Close'].rolling(window=20).mean()
+        rolling_std = df['Close'].rolling(window=20).std()
+        df['Upper Band'] = rolling_mean + (rolling_std * 2)
+        df['Lower Band'] = rolling_mean - (rolling_std * 2)
         
         return df
     except Exception as e:
