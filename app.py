@@ -1,17 +1,38 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import logging
 import os
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Load supported symbols from a JSON file
+SYMBOLS_FILE = 'supported_symbols.json'
+
+def load_symbols():
+    try:
+        if os.path.exists(SYMBOLS_FILE):
+            with open(SYMBOLS_FILE, 'r') as f:
+                return json.load(f)
+        return ['AAPL', 'GOOGL', 'MSFT', 'META', 'NVDA']
+    except Exception as e:
+        logger.error(f"Error loading symbols: {str(e)}")
+        return ['AAPL', 'GOOGL', 'MSFT', 'META', 'NVDA']
+
+def save_symbols(symbols):
+    try:
+        with open(SYMBOLS_FILE, 'w') as f:
+            json.dump(symbols, f)
+    except Exception as e:
+        logger.error(f"Error saving symbols: {str(e)}")
+
 # List of supported stock symbols
-SUPPORTED_SYMBOLS = ['AAPL', 'GOOGL', 'MSFT', 'META', 'NVDA']
+SUPPORTED_SYMBOLS = load_symbols()
 
 def fetch_stock_data(symbol, period='1y'):
     """Fetch stock data from Yahoo Finance"""
@@ -66,6 +87,35 @@ def index():
 def health():
     """Health check endpoint"""
     return jsonify({"status": "healthy"}), 200
+
+@app.route('/api/add_stock', methods=['POST'])
+def add_stock():
+    """Add a new stock symbol"""
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol', '').upper()
+        
+        if not symbol:
+            return jsonify({'success': False, 'error': 'No symbol provided'}), 400
+            
+        if symbol in SUPPORTED_SYMBOLS:
+            return jsonify({'success': False, 'error': 'Symbol already exists'}), 400
+        
+        # Verify the symbol exists
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        if not info or 'regularMarketPrice' not in info:
+            return jsonify({'success': False, 'error': 'Invalid symbol'}), 400
+        
+        # Add to supported symbols
+        SUPPORTED_SYMBOLS.append(symbol)
+        save_symbols(SUPPORTED_SYMBOLS)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error adding stock: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/history/<symbol>')
 def get_history(symbol):

@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const stockSelect = document.getElementById('stockSelect');
     const stockChart = document.getElementById('stockChart');
+    const addStockButton = document.getElementById('addStockButton');
+    const addStockModal = new bootstrap.Modal(document.getElementById('addStockModal'));
     
     function updateChart(historyData) {
         const trace1 = {
@@ -81,6 +83,26 @@ document.addEventListener('DOMContentLoaded', function() {
             `$${predictionData.prediction.toFixed(2)}`;
     }
     
+    function updateTechnicalIndicators(historyData) {
+        // Get the latest values
+        const lastIndex = historyData.dates.length - 1;
+        
+        // Update RSI
+        const rsiValue = historyData.technical_indicators.rsi[lastIndex];
+        document.getElementById('rsiValue').textContent = 
+            rsiValue ? rsiValue.toFixed(2) : '-';
+        
+        // Update SMA20
+        const sma20Value = historyData.technical_indicators.sma20[lastIndex];
+        document.getElementById('sma20Value').textContent = 
+            sma20Value ? `$${sma20Value.toFixed(2)}` : '-';
+        
+        // Update SMA50
+        const sma50Value = historyData.technical_indicators.sma50[lastIndex];
+        document.getElementById('sma50Value').textContent = 
+            sma50Value ? `$${sma50Value.toFixed(2)}` : '-';
+    }
+    
     function updateData() {
         const symbol = stockSelect.value;
         
@@ -92,6 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(historyData => {
                 updateChart(historyData);
+                updateTechnicalIndicators(historyData);
                 
                 // Fetch prediction
                 return fetch(`/api/predict/${symbol}`);
@@ -105,6 +128,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 stockChart.innerHTML = '<div class="text-center text-danger">Error loading data</div>';
             });
     }
+    
+    // Handle adding new stock
+    addStockButton.addEventListener('click', function() {
+        const symbolInput = document.getElementById('stockSymbol');
+        const symbol = symbolInput.value.trim().toUpperCase();
+        
+        if (!symbol) {
+            alert('Please enter a stock symbol');
+            return;
+        }
+        
+        fetch('/api/add_stock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ symbol: symbol })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Add new option to select
+                const option = new Option(symbol, symbol);
+                stockSelect.add(option);
+                
+                // Select the new stock
+                stockSelect.value = symbol;
+                
+                // Update the chart
+                updateData();
+                
+                // Close modal
+                addStockModal.hide();
+                
+                // Clear input
+                symbolInput.value = '';
+            } else {
+                alert(data.error || 'Failed to add stock');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to add stock. Please try again.');
+        });
+    });
     
     // Initial update
     updateData();
