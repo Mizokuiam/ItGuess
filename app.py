@@ -50,9 +50,8 @@ education_service = EducationService()
 export_service = ExportService()
 
 # API Routes
-@app.route('/api/stock_data')
-def get_stock_data():
-    symbol = request.args.get('symbol')
+@app.route('/api/stock/<symbol>')
+def get_stock_data(symbol):
     period = request.args.get('period', '1d')
     
     try:
@@ -81,6 +80,9 @@ def get_stock_data():
         rsi = technical_analysis.calculate_rsi(hist['Close'])
         macd, signal = technical_analysis.calculate_macd(hist['Close'])
         
+        # Calculate predictions
+        prediction_data = prediction_service.get_prediction(symbol, period)
+        
         return jsonify({
             'success': True,
             'prices': prices,
@@ -89,7 +91,7 @@ def get_stock_data():
                 'change': price_change,
                 'volume': info.get('volume', hist['Volume'].iloc[-1])
             },
-            'predicted': prediction_service.get_prediction(symbol, period),
+            'predicted': prediction_data,
             'indicators': {
                 'RSI': f"{rsi:.2f}",
                 'MACD': f"{macd:.2f}",
@@ -98,6 +100,7 @@ def get_stock_data():
         })
     
     except Exception as e:
+        logger.error(f"Error fetching stock data for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/add_stock', methods=['POST'])
@@ -182,85 +185,6 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-@app.route('/api/stock/<symbol>')
-def get_stock_data(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
-        
-        # Get historical data
-        df = stock.history(start=start_date, end=end_date)
-        
-        if df.empty:
-            return jsonify({'success': False, 'error': 'No data available for this stock'}), 404
-            
-        # Calculate technical indicators
-        tech_analysis = TechnicalAnalysisService()
-        indicators = tech_analysis.calculate_indicators(df)
-        
-        if not indicators:
-            return jsonify({'success': False, 'error': 'Failed to calculate indicators'}), 500
-        
-        # Format the data for response
-        data = {
-            'success': True,
-            'dates': df.index.strftime('%Y-%m-%d').tolist(),
-            'prices': df['Close'].round(2).tolist(),
-            'current_price': df['Close'][-1].round(2),
-            'previous_close': df['Close'][-2].round(2) if len(df) > 1 else df['Close'][-1].round(2),
-            'indicators': indicators
-        }
-        
-        return jsonify(data)
-    except Exception as e:
-        logger.error(f"Error fetching stock data: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/predict/<symbol>')
-def predict_stock(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
-        
-        # Get historical data
-        df = stock.history(start=start_date, end=end_date)
-        
-        if df.empty:
-            return jsonify({'success': False, 'error': 'No data available for this stock'}), 404
-        
-        # Set data for prediction service
-        prediction_service.set_data(df)
-        
-        # Get prediction
-        prediction = prediction_service.predict()
-        current_price = df['Close'][-1]
-        
-        response = {
-            'success': True,
-            'current_price': round(current_price, 2),
-            'predicted_price': round(prediction['predicted_price'], 2),
-            'confidence': round(prediction['confidence'], 4),
-            'prediction_date': (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-        }
-        
-        return jsonify(response)
-    except Exception as e:
-        logger.error(f"Error making prediction: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/indicators/<symbol>')
-def get_indicators(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        history = stock.history(period='1y')
-        indicators = technical_analysis.calculate_indicators(history)
-        return jsonify(indicators)
-    except Exception as e:
-        logger.error(f"Error calculating indicators: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/portfolio')
 @login_required
 def get_portfolio():
@@ -339,5 +263,6 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
+    # Get port from environment variable for Render compatibility
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
