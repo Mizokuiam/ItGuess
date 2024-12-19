@@ -20,7 +20,47 @@ class TechnicalAnalysisService:
             data = ticker.history(start=start_date, end=end_date)
             return data
         return pd.DataFrame()
+
+    def calculate_indicators(self, data=None):
+        """Calculate main technical indicators and return them as a dictionary"""
+        if data is not None:
+            self.data = data
         
+        if self.data.empty:
+            return {}
+
+        # Calculate RSI
+        delta = self.data['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+
+        # Calculate MACD
+        exp1 = self.data['Close'].ewm(span=12, adjust=False).mean()
+        exp2 = self.data['Close'].ewm(span=26, adjust=False).mean()
+        macd = exp1 - exp2
+        signal = macd.ewm(span=9, adjust=False).mean()
+
+        # Calculate Volume SMA
+        volume_sma = self.data['Volume'].rolling(window=20).mean()
+
+        # Get the latest values
+        latest_rsi = rsi.iloc[-1]
+        latest_macd = macd.iloc[-1]
+        latest_signal = signal.iloc[-1]
+        latest_volume = self.data['Volume'].iloc[-1]
+        latest_volume_sma = volume_sma.iloc[-1]
+
+        # Return indicators dictionary
+        return {
+            'RSI': latest_rsi,
+            'MACD': latest_macd,
+            'Signal': latest_signal,
+            'Volume': latest_volume,
+            'Volume_SMA': latest_volume_sma
+        }
+
     def calculate_all_indicators(self):
         """Calculate all technical indicators"""
         if self.data.empty:

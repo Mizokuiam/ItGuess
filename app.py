@@ -67,7 +67,11 @@ def get_stock_data(symbol):
             return jsonify({'success': False, 'error': 'No data available for this stock'}), 404
             
         # Calculate technical indicators
-        indicators = technical_analysis.calculate_indicators(df)
+        tech_analysis = TechnicalAnalysisService()
+        indicators = tech_analysis.calculate_indicators(df)
+        
+        if not indicators:
+            return jsonify({'success': False, 'error': 'Failed to calculate indicators'}), 500
         
         # Format the data for response
         data = {
@@ -75,13 +79,8 @@ def get_stock_data(symbol):
             'dates': df.index.strftime('%Y-%m-%d').tolist(),
             'prices': df['Close'].round(2).tolist(),
             'current_price': df['Close'][-1].round(2),
-            'previous_close': df['Close'][-2].round(2),
-            'volume': df['Volume'][-1],
-            'indicators': {
-                'rsi': round(indicators['RSI'][-1], 2) if 'RSI' in indicators else None,
-                'macd': round(indicators['MACD'][-1], 2) if 'MACD' in indicators else None,
-                'signal': round(indicators['Signal'][-1], 2) if 'Signal' in indicators else None
-            }
+            'previous_close': df['Close'][-2].round(2) if len(df) > 1 else df['Close'][-1].round(2),
+            'indicators': indicators
         }
         
         return jsonify(data)
