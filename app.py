@@ -49,7 +49,97 @@ portfolio_service = PortfolioService()
 education_service = EducationService()
 export_service = ExportService()
 
-# Routes
+# API Routes
+@app.route('/api/stock_data')
+def get_stock_data():
+    symbol = request.args.get('symbol')
+    period = request.args.get('period', '1d')
+    
+    try:
+        # Get stock data using yfinance
+        stock = yf.Ticker(symbol)
+        hist = stock.history(period='1mo')
+        
+        if hist.empty:
+            return jsonify({'error': 'No data available for this stock'}), 404
+        
+        # Get current stock info
+        info = stock.info
+        current_price = info.get('regularMarketPrice', hist['Close'].iloc[-1])
+        previous_close = info.get('previousClose', hist['Close'].iloc[-2])
+        price_change = ((current_price - previous_close) / previous_close) * 100
+        
+        # Format historical data for chart
+        prices = []
+        for date, row in hist.iterrows():
+            prices.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'price': round(row['Close'], 2)
+            })
+        
+        # Get technical indicators
+        rsi = technical_analysis.calculate_rsi(hist['Close'])
+        macd, signal = technical_analysis.calculate_macd(hist['Close'])
+        
+        return jsonify({
+            'success': True,
+            'prices': prices,
+            'current': {
+                'price': current_price,
+                'change': price_change,
+                'volume': info.get('volume', hist['Volume'].iloc[-1])
+            },
+            'predicted': prediction_service.get_prediction(symbol, period),
+            'indicators': {
+                'RSI': f"{rsi:.2f}",
+                'MACD': f"{macd:.2f}",
+                'Signal': f"{signal:.2f}"
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/add_stock', methods=['POST'])
+def add_stock():
+    data = request.get_json()
+    symbol = data.get('symbol', '').upper()
+    
+    try:
+        # Verify stock exists
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        if not info or 'regularMarketPrice' not in info:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid stock symbol'
+            }), 400
+        
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'name': info.get('shortName', symbol)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/stocks')
+def get_stocks():
+    # For now, return a list of popular tech stocks
+    stocks = [
+        {'symbol': 'AAPL', 'name': 'Apple Inc.'},
+        {'symbol': 'GOOGL', 'name': 'Alphabet Inc.'},
+        {'symbol': 'MSFT', 'name': 'Microsoft Corporation'},
+        {'symbol': 'AMZN', 'name': 'Amazon.com Inc.'},
+        {'symbol': 'META', 'name': 'Meta Platforms Inc.'}
+    ]
+    return jsonify(stocks)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -67,6 +157,30 @@ def watchlist():
 @app.route('/education')
 def education():
     return render_template('education.html')
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    return render_template('change_password.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
 
 @app.route('/api/stock/<symbol>')
 def get_stock_data(symbol):
@@ -213,31 +327,6 @@ def export_portfolio():
 @app.route('/health')
 def health():
     return jsonify({'status': 'healthy'})
-
-# Auth routes
-@app.route('/login')
-def login():
-    return render_template('auth/login.html')
-
-@app.route('/register')
-def register():
-    return render_template('auth/register.html')
-
-@app.route('/profile')
-@login_required
-def profile():
-    return render_template('auth/profile.html')
-
-@app.route('/change-password')
-@login_required
-def change_password():
-    return render_template('auth/change_password.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('index'))
 
 # Error handlers
 @app.errorhandler(404)

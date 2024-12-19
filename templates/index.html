@@ -1,95 +1,93 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="text-center mb-4">AI-Powered Stock Price Predictor</h1>
-    <p class="text-center text-muted mb-4">Make informed investment decisions with our advanced machine learning predictions</p>
-
-    <!-- Stock Analysis Section -->
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Stock Analysis</h5>
-            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStockModal">
-                Add Stock
-            </button>
+<div class="row">
+    <!-- Stock Search and Add Section -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Add Stock</h5>
+                <div class="input-group mb-3">
+                    <input type="text" id="stockSymbol" class="form-control" placeholder="Enter stock symbol (e.g., AAPL)">
+                    <button class="btn btn-primary" type="button" onclick="addStock()">
+                        <i class="bi bi-plus-lg"></i> Add
+                    </button>
+                </div>
+                <div id="stockError" class="alert alert-danger d-none"></div>
+            </div>
         </div>
-        <div class="card-body">
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="stockSelect" class="form-label">Select Stock:</label>
-                    <select class="form-select" id="stockSelect">
-                        <option value="">Choose a stock...</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label for="predictionPeriod" class="form-label">Prediction Period:</label>
-                    <select class="form-select" id="predictionPeriod">
-                        <option value="1d">1 Day</option>
-                        <option value="1w">1 Week</option>
-                        <option value="1m">1 Month</option>
-                    </select>
+
+        <!-- Technical Indicators -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Technical Indicators</h5>
+                <div id="technicalIndicators">
+                    <!-- Indicators will be added here -->
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="chart-container mb-4">
-                <canvas id="stockChart"></canvas>
-            </div>
-
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h6 class="card-title">Current Price</h6>
-                            <h4 id="currentPrice">--</h4>
-                            <p id="priceChange" class="mb-0">--</p>
-                        </div>
-                    </div>
+    <!-- Main Chart Section -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Stock Chart</h5>
+                <div id="stockChart" class="chart-container"></div>
+                <div class="btn-group mt-3">
+                    <button class="btn btn-outline-secondary" onclick="updateChart('1d')">1D</button>
+                    <button class="btn btn-outline-secondary" onclick="updateChart('1w')">1W</button>
+                    <button class="btn btn-outline-secondary" onclick="updateChart('1m')">1M</button>
+                    <button class="btn btn-outline-secondary" onclick="updateChart('3m')">3M</button>
+                    <button class="btn btn-outline-secondary" onclick="updateChart('1y')">1Y</button>
                 </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h6 class="card-title">Predicted Price</h6>
-                            <h4 id="predictedPrice">--</h4>
-                            <p id="confidenceLevel" class="mb-0">--</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h6 class="card-title">Volume</h6>
-                            <h4 id="volume">--</h4>
-                            <p class="mb-0">24h Volume</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="technicalIndicators" class="row mt-3">
-                <!-- Technical indicators will be added here dynamically -->
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add Stock Modal -->
-<div class="modal fade" id="addStockModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Stock</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="newStockSymbol" class="form-label">Stock Symbol</label>
-                    <input type="text" class="form-control" id="newStockSymbol" placeholder="e.g., AAPL">
-                    <small class="form-text text-muted">Enter the stock symbol (e.g., AAPL for Apple Inc.)</small>
+<!-- Stock List Section -->
+<div class="row" id="stockList">
+    <!-- Stock cards will be dynamically added here -->
+</div>
+
+<!-- Prediction Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card prediction-card">
+            <div class="card-body">
+                <h5 class="card-title">Price Predictions</h5>
+                <div id="predictions" class="row">
+                    <!-- Prediction cards will be dynamically added here -->
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="addStockButton">Add Stock</button>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-graph-up text-primary"></i> Real-Time Data</h5>
+                <p class="card-text">Get live stock prices, charts, and technical indicators updated in real-time.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-robot text-primary"></i> AI Predictions</h5>
+                <p class="card-text">Advanced machine learning models predict future stock prices with confidence scores.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-tools text-primary"></i> Technical Analysis</h5>
+                <p class="card-text">Access key technical indicators like RSI and MACD to make informed decisions.</p>
             </div>
         </div>
     </div>
