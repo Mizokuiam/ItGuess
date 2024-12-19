@@ -64,30 +64,30 @@ def get_stock_data(symbol):
         df = stock.history(start=start_date, end=end_date)
         
         if df.empty:
-            return jsonify({'error': 'No data available for this stock'}), 404
+            return jsonify({'success': False, 'error': 'No data available for this stock'}), 404
             
         # Calculate technical indicators
         indicators = technical_analysis.calculate_indicators(df)
-        df = df.join(indicators)
         
         # Format the data for response
         data = {
+            'success': True,
             'dates': df.index.strftime('%Y-%m-%d').tolist(),
-            'prices': df['Close'].tolist(),
-            'volumes': df['Volume'].tolist(),
+            'prices': df['Close'].round(2).tolist(),
+            'current_price': df['Close'][-1].round(2),
+            'previous_close': df['Close'][-2].round(2),
+            'volume': df['Volume'][-1],
             'indicators': {
-                'RSI': df['RSI'].tolist() if 'RSI' in df.columns else [],
-                'MACD': df['MACD'].tolist() if 'MACD' in df.columns else [],
-                'Signal': df['Signal'].tolist() if 'Signal' in df.columns else [],
-                'K': df['%K'].tolist() if '%K' in df.columns else [],
-                'D': df['%D'].tolist() if '%D' in df.columns else []
+                'rsi': round(indicators['RSI'][-1], 2) if 'RSI' in indicators else None,
+                'macd': round(indicators['MACD'][-1], 2) if 'MACD' in indicators else None,
+                'signal': round(indicators['Signal'][-1], 2) if 'Signal' in indicators else None
             }
         }
         
         return jsonify(data)
     except Exception as e:
         logger.error(f"Error fetching stock data: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/predict/<symbol>')
 def predict_stock(symbol):
@@ -100,28 +100,27 @@ def predict_stock(symbol):
         df = stock.history(start=start_date, end=end_date)
         
         if df.empty:
-            return jsonify({'error': 'No data available for this stock'}), 404
-            
-        # Calculate technical indicators
-        indicators = technical_analysis.calculate_indicators(df)
-        df = df.join(indicators)
+            return jsonify({'success': False, 'error': 'No data available for this stock'}), 404
         
-        # Set data for prediction
+        # Set data for prediction service
         prediction_service.set_data(df)
         
-        # Make prediction
-        predicted_price = prediction_service.make_prediction()
+        # Get prediction
+        prediction = prediction_service.predict()
+        current_price = df['Close'][-1]
         
-        return jsonify({
-            'predicted_price': predicted_price,
-            'current_price': df['Close'].iloc[-1],
-            'prediction_date': datetime.now().strftime('%Y-%m-%d')
-        })
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        response = {
+            'success': True,
+            'current_price': round(current_price, 2),
+            'predicted_price': round(prediction['predicted_price'], 2),
+            'confidence': round(prediction['confidence'], 4),
+            'prediction_date': (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        }
+        
+        return jsonify(response)
     except Exception as e:
         logger.error(f"Error making prediction: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/indicators/<symbol>')
 def get_indicators(symbol):

@@ -1,12 +1,13 @@
 // Global Variables
 let currentSymbol = '';
-let chartInstance = null;
+let stockChart = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Main.js loaded');
     
     // Initialize Select2
     $(document).ready(function() {
+        // Initialize Select2 for stock selection
         $('#stockSelect').select2({
             theme: 'bootstrap4',
             placeholder: 'Select a stock...',
@@ -14,8 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Initialize Chart
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        chartInstance = new Chart(ctx, {
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        stockChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
@@ -27,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderWidth: 2,
                     pointRadius: 3,
                     pointBackgroundColor: '#2196F3',
-                    tension: 0.4
+                    tension: 0.4,
+                    fill: true
                 }]
             },
             options: {
@@ -36,11 +38,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: {
                         display: true,
-                        position: 'top'
+                        position: 'top',
+                        labels: {
+                            color: '#666666'
+                        }
                     },
                     tooltip: {
                         mode: 'index',
-                        intersect: false
+                        intersect: false,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: '#2196F3',
+                        borderWidth: 1
                     }
                 },
                 scales: {
@@ -48,16 +58,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         display: true,
                         title: {
                             display: true,
-                            text: 'Date'
+                            text: 'Date',
+                            color: '#666666'
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
                         }
                     },
                     y: {
                         display: true,
                         title: {
                             display: true,
-                            text: 'Price ($)'
+                            text: 'Price ($)',
+                            color: '#666666'
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
                         }
                     }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                animation: {
+                    duration: 1000
                 }
             }
         });
@@ -66,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#stockSelect').on('change', function() {
             const selectedStock = $(this).val();
             if (selectedStock) {
-                updateData(selectedStock);
+                updateStockData(selectedStock);
             }
         });
 
@@ -81,40 +108,41 @@ document.addEventListener('DOMContentLoaded', function() {
             const symbol = $('#stockSymbol').val().toUpperCase();
             addNewStock(symbol);
         });
+
+        // Initialize tooltips
+        $('[data-bs-toggle="tooltip"]').tooltip();
     });
 
     // Update chart theme based on dark mode
     function updateChartTheme() {
         const isDarkMode = $('body').hasClass('dark-mode');
         const textColor = isDarkMode ? '#ffffff' : '#666666';
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
         
-        chartInstance.options.scales.x.ticks.color = textColor;
-        chartInstance.options.scales.y.ticks.color = textColor;
-        chartInstance.options.scales.x.title.color = textColor;
-        chartInstance.options.scales.y.title.color = textColor;
-        chartInstance.options.plugins.legend.labels.color = textColor;
-        chartInstance.update();
+        stockChart.options.scales.x.ticks.color = textColor;
+        stockChart.options.scales.y.ticks.color = textColor;
+        stockChart.options.scales.x.title.color = textColor;
+        stockChart.options.scales.y.title.color = textColor;
+        stockChart.options.scales.x.grid.color = gridColor;
+        stockChart.options.scales.y.grid.color = gridColor;
+        stockChart.options.plugins.legend.labels.color = textColor;
+        stockChart.update();
     }
 
     // Fetch and update stock data
-    async function updateData(symbol) {
+    async function updateStockData(symbol) {
         showLoading();
         try {
-            const period = document.getElementById('predictionPeriod').value;
-            const response = await fetch(`/api/stock/${symbol}?period=${period}`);
+            const response = await fetch(`/api/stock/${symbol}`);
             const data = await response.json();
             
             if (data.success) {
                 updateChart(data.prices, data.dates);
-                updatePrices({
-                    current: data.current_price,
-                    previous: data.previous_close,
-                    predicted: data.prediction.price,
-                    confidence: data.prediction.confidence
-                });
+                updateCurrentPrice(data.current_price, data.previous_close);
+                getPrediction(symbol);
                 updateTechnicalIndicators(data.indicators);
             } else {
-                showError('Failed to fetch stock data');
+                showError(data.error || 'Failed to fetch stock data');
             }
         } catch (error) {
             showError('Error fetching stock data');
@@ -126,14 +154,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update chart with new data
     function updateChart(prices, dates) {
-        chartInstance.data.labels = dates;
-        chartInstance.data.datasets[0].data = prices;
-        chartInstance.update();
+        stockChart.data.labels = dates;
+        stockChart.data.datasets[0].data = prices;
+        stockChart.update();
+    }
+
+    // Update current price display
+    function updateCurrentPrice(currentPrice, previousClose) {
+        const change = ((currentPrice - previousClose) / previousClose * 100).toFixed(2);
+        const direction = change >= 0 ? 'up' : 'down';
+        
+        $('#currentPrice').text(`$${currentPrice}`);
+        $('#priceChange').html(`
+            <i class="fas fa-arrow-${direction}"></i>
+            ${Math.abs(change)}%
+        `).removeClass('text-success text-danger')
+          .addClass(direction === 'up' ? 'text-success' : 'text-danger');
     }
 
     // Get and display prediction
     async function getPrediction(symbol) {
-        showLoading();
         try {
             const response = await fetch(`/api/predict/${symbol}`);
             const data = await response.json();
@@ -141,29 +181,78 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 updatePredictionDisplay(data);
             } else {
-                showError('Failed to get prediction');
+                showError(data.error || 'Failed to get prediction');
             }
         } catch (error) {
             showError('Error getting prediction');
             console.error('Error:', error);
-        } finally {
-            hideLoading();
         }
     }
 
     // Update prediction display
     function updatePredictionDisplay(data) {
-        const currentPrice = parseFloat(data.current_price).toFixed(2);
-        const predictedPrice = parseFloat(data.predicted_price).toFixed(2);
+        const currentPrice = parseFloat(data.current_price);
+        const predictedPrice = parseFloat(data.predicted_price);
         const change = ((predictedPrice - currentPrice) / currentPrice * 100).toFixed(2);
+        const direction = change >= 0 ? 'up' : 'down';
         
-        $('#currentPrice').text(`$${currentPrice}`);
         $('#predictedPrice').text(`$${predictedPrice}`);
+        $('#predictionChange').html(`
+            <i class="fas fa-arrow-${direction}"></i>
+            ${Math.abs(change)}%
+        `).removeClass('text-success text-danger')
+          .addClass(direction === 'up' ? 'text-success' : 'text-danger');
         
-        const changeElement = $('#priceChange');
-        changeElement.text(`${change}%`);
-        changeElement.removeClass('price-up price-down');
-        changeElement.addClass(change >= 0 ? 'price-up' : 'price-down');
+        $('#predictionDate').text(`Prediction for: ${data.prediction_date}`);
+        $('#predictionConfidence').text(`Confidence: ${(data.confidence * 100).toFixed(1)}%`);
+    }
+
+    // Update technical indicators
+    function updateTechnicalIndicators(data) {
+        const indicators = $('#technicalIndicators');
+        indicators.empty();
+        
+        const indicatorData = [
+            {
+                name: 'RSI',
+                value: data.rsi,
+                icon: 'fa-signal',
+                description: 'Relative Strength Index',
+                type: data.rsi > 70 ? 'danger' : data.rsi < 30 ? 'success' : 'info'
+            },
+            {
+                name: 'MACD',
+                value: data.macd,
+                icon: 'fa-chart-line',
+                description: 'Moving Average Convergence Divergence',
+                type: data.macd > 0 ? 'success' : 'danger'
+            },
+            {
+                name: 'Signal',
+                value: data.signal,
+                icon: 'fa-wave-square',
+                description: 'MACD Signal Line',
+                type: 'info'
+            }
+        ];
+        
+        indicatorData.forEach(indicator => {
+            if (indicator.value !== null) {
+                const card = `
+                    <div class="col-md-4">
+                        <div class="card indicator-card">
+                            <div class="card-body text-center">
+                                <i class="fas ${indicator.icon} mb-2 text-${indicator.type}"></i>
+                                <h5 class="card-title">${indicator.name}</h5>
+                                <p class="indicator-value text-${indicator.type}">${indicator.value}</p>
+                                <small class="text-muted">${indicator.description}</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                indicators.append(card);
+            }
+        });
     }
 
     // Add new stock to the list
@@ -195,62 +284,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Loading state management
     function showLoading() {
-        $('#loadingOverlay').fadeIn();
+        $('#loadingOverlay').fadeIn(200);
     }
 
     function hideLoading() {
-        $('#loadingOverlay').fadeOut();
+        $('#loadingOverlay').fadeOut(200);
     }
 
-    // Error handling
+    // Error handling with toast notifications
     function showError(message) {
-        // You can implement a toast or alert system here
-        alert(message);
-    }
-
-    // Update technical indicators
-    function updateTechnicalIndicators(data) {
-        const indicators = $('#technicalIndicators');
-        indicators.empty();
-        
-        const indicatorData = [
-            { name: 'RSI', value: data.rsi, type: data.rsi > 70 ? 'danger' : data.rsi < 30 ? 'success' : 'info' },
-            { name: 'MACD', value: data.macd, type: data.macd > 0 ? 'success' : 'danger' },
-            { name: 'Volume', value: data.volume.toLocaleString(), type: 'info' }
-        ];
-        
-        indicatorData.forEach(indicator => {
-            const card = `
-                <div class="col-md-4">
-                    <div class="indicator-card card bg-light">
-                        <div class="card-body text-center">
-                            <h5 class="card-title">${indicator.name}</h5>
-                            <p class="indicator-value text-${indicator.type}">${indicator.value}</p>
-                        </div>
-                    </div>
+        const toast = `
+            <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+                <div class="toast-header bg-danger text-white">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong class="me-auto">Error</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
                 </div>
-            `;
-            indicators.append(card);
-        });
-    }
-
-    // Update prices
-    function updatePrices(predictionData) {
-        const currentPrice = document.getElementById('currentPrice');
-        const predictedPrice = document.getElementById('predictedPrice');
-        const priceChange = document.getElementById('priceChange').querySelector('span');
-        const predictionConfidence = document.getElementById('predictionConfidence').querySelector('span');
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
         
-        if (predictionData.current) {
-            currentPrice.textContent = `$${predictionData.current.toFixed(2)}`;
-            const change = ((predictionData.current - predictionData.previous) / predictionData.previous * 100);
-            priceChange.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-            priceChange.className = change >= 0 ? 'price-up' : 'price-down';
+        const toastContainer = $('#toastContainer');
+        if (!toastContainer.length) {
+            $('body').append('<div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>');
         }
         
-        if (predictionData.predicted) {
-            predictedPrice.textContent = `$${predictionData.predicted.toFixed(2)}`;
-            predictionConfidence.textContent = `${(predictionData.confidence * 100).toFixed(1)}%`;
-        }
+        const toastElement = $(toast);
+        $('#toastContainer').append(toastElement);
+        const bsToast = new bootstrap.Toast(toastElement[0]);
+        bsToast.show();
     }
 });
