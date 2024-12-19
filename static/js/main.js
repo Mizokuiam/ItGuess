@@ -5,6 +5,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const stockChart = document.getElementById('stockChart');
     const addStockButton = document.getElementById('addStockButton');
     const addStockModal = new bootstrap.Modal(document.getElementById('addStockModal'));
+    const predictionPeriod = document.getElementById('predictionPeriod');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    
+    function showLoading(show) {
+        loadingOverlay.style.display = show ? 'flex' : 'none';
+    }
     
     function updateChart(historyData) {
         const trace1 = {
@@ -81,6 +87,17 @@ document.addEventListener('DOMContentLoaded', function() {
             `$${predictionData.current_price.toFixed(2)}`;
         document.getElementById('predictedPrice').textContent = 
             `$${predictionData.prediction.toFixed(2)}`;
+            
+        // Update prediction method and factors
+        document.getElementById('predictionMethod').textContent = predictionData.method;
+        
+        const factorsList = document.getElementById('predictionFactors');
+        factorsList.innerHTML = '';
+        predictionData.factors.forEach(factor => {
+            const li = document.createElement('li');
+            li.textContent = factor;
+            factorsList.appendChild(li);
+        });
     }
     
     function updateTechnicalIndicators(historyData) {
@@ -105,9 +122,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updateData() {
         const symbol = stockSelect.value;
+        const period = predictionPeriod.value;
         
-        // Show loading state
-        stockChart.innerHTML = '<div class="text-center">Loading...</div>';
+        showLoading(true);
         
         // Fetch historical data
         fetch(`/api/history/${symbol}`)
@@ -116,8 +133,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateChart(historyData);
                 updateTechnicalIndicators(historyData);
                 
-                // Fetch prediction
-                return fetch(`/api/predict/${symbol}`);
+                // Fetch prediction with period
+                return fetch(`/api/predict/${symbol}?period=${period}`);
             })
             .then(response => response.json())
             .then(predictionData => {
@@ -126,6 +143,9 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error:', error);
                 stockChart.innerHTML = '<div class="text-center text-danger">Error loading data</div>';
+            })
+            .finally(() => {
+                showLoading(false);
             });
     }
     
@@ -138,6 +158,8 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please enter a stock symbol');
             return;
         }
+        
+        showLoading(true);
         
         fetch('/api/add_stock', {
             method: 'POST',
@@ -171,6 +193,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error:', error);
             alert('Failed to add stock. Please try again.');
+        })
+        .finally(() => {
+            showLoading(false);
         });
     });
     
@@ -179,6 +204,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update when stock selection changes
     stockSelect.addEventListener('change', updateData);
+    
+    // Update when prediction period changes
+    predictionPeriod.addEventListener('change', updateData);
     
     // Update every 5 minutes
     setInterval(updateData, 300000);
