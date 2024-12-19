@@ -54,9 +54,8 @@ def get_history(symbol):
         }
         
         return jsonify(response)
-    
     except Exception as e:
-        logger.error(f"Error getting history for {symbol}: {str(e)}")
+        logger.error(f"Error in get_history: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/predict/<symbol>')
@@ -68,41 +67,37 @@ def predict_price(symbol):
         if symbol not in SUPPORTED_SYMBOLS:
             return jsonify({'error': 'Invalid symbol'}), 400
         
-        # Fetch latest data
+        # Fetch historical data
         stock_data = data_processor.fetch_stock_data(symbol)
         if stock_data is None:
             return jsonify({'error': 'Failed to fetch stock data'}), 500
         
-        # Prepare features for prediction
-        features = data_processor.prepare_features(stock_data)
+        # Get the current price
+        current_price = stock_data['Close'].iloc[-1]
         
-        # Load or train model if needed
-        model = model_trainer.load_model(symbol)
-        if model is None:
-            model, metrics = model_trainer.train_random_forest(
-                features.iloc[:-1], 
-                stock_data['Close'].iloc[1:],
-                symbol
-            )
-            if model is None:
-                return jsonify({'error': 'Failed to train model'}), 500
+        # Calculate technical indicators for prediction
+        indicators = data_processor.calculate_indicators(stock_data)
+        
+        # Prepare features for prediction
+        features = data_processor.prepare_features(stock_data, indicators)
         
         # Make prediction
-        latest_features = features.iloc[-1:]
-        prediction = model.predict(latest_features)[0]
+        prediction = model_trainer.predict(features.iloc[-1:])
         
         response = {
-            'symbol': symbol,
-            'current_price': stock_data['Close'].iloc[-1],
-            'prediction': prediction,
-            'timestamp': datetime.now().isoformat()
+            'current_price': float(current_price),
+            'prediction': float(prediction[0]),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
         return jsonify(response)
-    
     except Exception as e:
-        logger.error(f"Error predicting price for {symbol}: {str(e)}")
+        logger.error(f"Error in predict_price: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+# For local development
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True)
+
+# For Vercel
+app = app
