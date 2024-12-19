@@ -1,10 +1,9 @@
 from flask import Flask, render_template, jsonify
 import yfinance as yf
 import pandas as pd
-import numpy as np
+import pandas_ta as ta
 from datetime import datetime, timedelta
 import logging
-import ta
 import os
 
 logging.basicConfig(level=logging.INFO)
@@ -32,15 +31,16 @@ def calculate_indicators(df):
             return None
             
         # Calculate SMA
-        df['SMA20'] = ta.trend.sma_indicator(df['Close'], window=20)
-        df['SMA50'] = ta.trend.sma_indicator(df['Close'], window=50)
+        df['SMA20'] = df.ta.sma(length=20)
+        df['SMA50'] = df.ta.sma(length=50)
         
         # Calculate RSI
-        df['RSI'] = ta.momentum.rsi(df['Close'], window=14)
+        df['RSI'] = df.ta.rsi(length=14)
         
         # Calculate Bollinger Bands
-        df['Upper Band'] = ta.volatility.bollinger_hband(df['Close'])
-        df['Lower Band'] = ta.volatility.bollinger_lband(df['Close'])
+        bollinger = df.ta.bbands(length=20)
+        df['Upper Band'] = bollinger['BBU_20_2.0']
+        df['Lower Band'] = bollinger['BBL_20_2.0']
         
         return df
     except Exception as e:
@@ -50,8 +50,8 @@ def calculate_indicators(df):
 def simple_moving_average_prediction(prices, window=5):
     """Simple prediction using moving average"""
     if len(prices) < window:
-        return prices[-1]
-    return np.mean(prices[-window:])
+        return prices.iloc[-1]
+    return prices.rolling(window=window).mean().iloc[-1]
 
 @app.route('/')
 def index():
@@ -118,8 +118,7 @@ def predict_price(symbol):
         current_price = stock_data['Close'].iloc[-1]
         
         # Simple prediction using moving average
-        prices = stock_data['Close'].values
-        prediction = simple_moving_average_prediction(prices)
+        prediction = simple_moving_average_prediction(stock_data['Close'])
         
         response = {
             'current_price': float(current_price),
