@@ -1,8 +1,41 @@
 /* General Styles */
 body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     background-color: #f8f9fa;
 }
 
+main {
+    flex: 1;
+}
+
+/* Loading Overlay */
+#loadingOverlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Loading and Error States */
+#loadingIndicator {
+    text-align: center;
+    padding: 1rem;
+}
+
+#errorMessage {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+/* Navbar Styles */
 .navbar-brand {
     font-weight: bold;
     font-size: 1.5rem;
@@ -10,9 +43,19 @@ body {
 
 /* Card Styles */
 .card {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
     border: none;
     margin-bottom: 1rem;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.indicator-card {
+    margin-bottom: 15px;
+    cursor: pointer;
 }
 
 .card-header {
@@ -41,14 +84,33 @@ body {
     color: #dc3545;
 }
 
-/* Chart Containers */
-#stockChart, #indicatorChart {
+/* Chart Container */
+#stockChart {
+    min-height: 400px;
+    width: 100%;
+    margin: 20px 0;
+    background-color: #fff;
+    border-radius: 4px;
+}
+
+#indicatorChart {
     width: 100%;
     background-color: #fff;
     border-radius: 4px;
 }
 
 /* Technical Indicators */
+.technical-indicator {
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.technical-indicator h6 {
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
 #technicalIndicators .card {
     transition: transform 0.2s;
 }
@@ -71,15 +133,40 @@ body {
     margin: 0;
 }
 
-/* Loading and Error States */
-#loadingIndicator {
-    text-align: center;
-    padding: 1rem;
+/* Portfolio Section */
+.portfolio-summary {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    margin-bottom: 20px;
 }
 
-#errorMessage {
-    text-align: center;
-    margin-bottom: 1rem;
+.position-card {
+    margin-bottom: 15px;
+}
+
+/* Watchlist */
+.watchlist-item {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.watchlist-item:last-child {
+    border-bottom: none;
+}
+
+/* Education Section */
+.education-card {
+    height: 100%;
+}
+
+.education-card .card-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.education-card .card-text {
+    flex-grow: 1;
 }
 
 /* Footer */
@@ -87,8 +174,16 @@ body {
     border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-/* Responsive Adjustments */
+/* Responsive Design */
 @media (max-width: 768px) {
+    .card {
+        margin-bottom: 15px;
+    }
+    
+    #stockChart {
+        min-height: 300px;
+    }
+    
     .card-body {
         padding: 1rem;
     }
@@ -96,4 +191,51 @@ body {
     #currentPrice, #predictedPrice, #priceChange {
         font-size: 1.5rem;
     }
+}
+
+/* Dark Mode */
+.dark-mode {
+    background-color: #343a40;
+    color: #f8f9fa;
+}
+
+.dark-mode .card {
+    background-color: #454d55;
+    border-color: #454d55;
+}
+
+.dark-mode .navbar {
+    background-color: #212529 !important;
+}
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }

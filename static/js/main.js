@@ -1,3 +1,262 @@
+// Global Variables
+let currentSymbol = '';
+let chartInstance = null;
+
+// DOM Ready
+$(document).ready(function() {
+    // Initialize tooltips and popovers
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    $('[data-bs-toggle="popover"]').popover();
+    
+    // Setup search form
+    $('#stockSearchForm').on('submit', handleStockSearch);
+    
+    // Setup technical indicator toggles
+    $('.indicator-toggle').on('change', handleIndicatorToggle);
+    
+    // Setup timeframe buttons
+    $('.timeframe-btn').on('click', handleTimeframeChange);
+    
+    // Setup dark mode toggle
+    $('#darkModeToggle').on('change', handleDarkModeToggle);
+    
+    // Load user preferences
+    loadUserPreferences();
+});
+
+// Stock Search Handler
+async function handleStockSearch(e) {
+    e.preventDefault();
+    const symbol = $('#stockSymbol').val().toUpperCase();
+    
+    showLoading();
+    try {
+        const response = await fetch(`/api/stock/${symbol}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            showError(data.error);
+            return;
+        }
+        
+        currentSymbol = symbol;
+        updateStockInfo(data);
+        updateChart(data.prices);
+        updateIndicators(data.indicators);
+        updatePredictions(data.predictions);
+        
+    } catch (error) {
+        showError('Failed to fetch stock data');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Chart Management
+function updateChart(prices) {
+    const trace = {
+        x: prices.map(p => p.date),
+        y: prices.map(p => p.close),
+        type: 'scatter',
+        name: currentSymbol
+    };
+    
+    const layout = {
+        title: `${currentSymbol} Price History`,
+        xaxis: { title: 'Date' },
+        yaxis: { title: 'Price ($)' },
+        showlegend: true
+    };
+    
+    Plotly.newPlot('stockChart', [trace], layout);
+}
+
+// Technical Indicators
+function handleIndicatorToggle(e) {
+    const indicator = $(this).data('indicator');
+    const isChecked = $(this).prop('checked');
+    
+    if (isChecked) {
+        showLoading();
+        fetch(`/api/indicator/${currentSymbol}/${indicator}`)
+            .then(response => response.json())
+            .then(data => {
+                addIndicatorToChart(data, indicator);
+            })
+            .catch(error => showError('Failed to load indicator'))
+            .finally(() => hideLoading());
+    } else {
+        removeIndicatorFromChart(indicator);
+    }
+}
+
+function addIndicatorToChart(data, indicator) {
+    const trace = {
+        x: data.dates,
+        y: data.values,
+        type: 'scatter',
+        name: indicator,
+        line: { dash: 'dot' }
+    };
+    
+    Plotly.addTraces('stockChart', trace);
+}
+
+function removeIndicatorFromChart(indicator) {
+    const chart = document.getElementById('stockChart');
+    const traces = chart.data;
+    const index = traces.findIndex(trace => trace.name === indicator);
+    
+    if (index > -1) {
+        Plotly.deleteTraces('stockChart', index);
+    }
+}
+
+// Timeframe Management
+function handleTimeframeChange(e) {
+    const timeframe = $(this).data('timeframe');
+    $('.timeframe-btn').removeClass('active');
+    $(this).addClass('active');
+    
+    showLoading();
+    fetch(`/api/stock/${currentSymbol}/${timeframe}`)
+        .then(response => response.json())
+        .then(data => {
+            updateChart(data.prices);
+            updateIndicators(data.indicators);
+        })
+        .catch(error => showError('Failed to update timeframe'))
+        .finally(() => hideLoading());
+}
+
+// Portfolio Management
+function updatePortfolio() {
+    showLoading();
+    fetch('/api/portfolio')
+        .then(response => response.json())
+        .then(data => {
+            renderPortfolio(data);
+        })
+        .catch(error => showError('Failed to update portfolio'))
+        .finally(() => hideLoading());
+}
+
+function renderPortfolio(data) {
+    const container = $('#portfolioContainer');
+    container.empty();
+    
+    // Render summary
+    const summary = `
+        <div class="portfolio-summary">
+            <h3>Portfolio Value: $${data.total_value.toFixed(2)}</h3>
+            <p>Daily Change: ${data.daily_change}%</p>
+        </div>
+    `;
+    container.append(summary);
+    
+    // Render positions
+    data.positions.forEach(position => {
+        const card = `
+            <div class="card position-card">
+                <div class="card-body">
+                    <h5 class="card-title">${position.symbol}</h5>
+                    <div class="row">
+                        <div class="col">
+                            <p>Shares: ${position.shares}</p>
+                            <p>Cost Basis: $${position.cost_basis}</p>
+                        </div>
+                        <div class="col">
+                            <p>Current Value: $${position.current_value}</p>
+                            <p>P/L: ${position.profit_loss}%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.append(card);
+    });
+}
+
+// Watchlist Management
+function updateWatchlist() {
+    showLoading();
+    fetch('/api/watchlist')
+        .then(response => response.json())
+        .then(data => {
+            renderWatchlist(data);
+        })
+        .catch(error => showError('Failed to update watchlist'))
+        .finally(() => hideLoading());
+}
+
+function renderWatchlist(data) {
+    const container = $('#watchlistContainer');
+    container.empty();
+    
+    data.items.forEach(item => {
+        const row = `
+            <div class="watchlist-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5>${item.symbol}</h5>
+                        <p class="mb-0">$${item.price}</p>
+                    </div>
+                    <div class="text-end">
+                        <p class="mb-0 ${item.change >= 0 ? 'text-success' : 'text-danger'}">
+                            ${item.change}%
+                        </p>
+                        <button class="btn btn-sm btn-danger remove-watchlist" data-symbol="${item.symbol}">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.append(row);
+    });
+    
+    // Setup remove buttons
+    $('.remove-watchlist').on('click', function() {
+        const symbol = $(this).data('symbol');
+        removeFromWatchlist(symbol);
+    });
+}
+
+// User Preferences
+function loadUserPreferences() {
+    const darkMode = localStorage.getItem('darkMode') === 'true';
+    if (darkMode) {
+        $('body').addClass('dark-mode');
+        $('#darkModeToggle').prop('checked', true);
+    }
+}
+
+function handleDarkModeToggle() {
+    const isDarkMode = $(this).prop('checked');
+    $('body').toggleClass('dark-mode', isDarkMode);
+    localStorage.setItem('darkMode', isDarkMode);
+}
+
+// Loading State Management
+function showLoading() {
+    $('#loadingOverlay').css('display', 'flex');
+}
+
+function hideLoading() {
+    $('#loadingOverlay').css('display', 'none');
+}
+
+// Error Handling
+function showError(message) {
+    const alert = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    $('#errorContainer').html(alert);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Main.js loaded');
     
