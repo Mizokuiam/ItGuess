@@ -1,0 +1,99 @@
+/* General Styles */
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* Card Styles */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: none;
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+    margin-bottom: 0;
+    color: #333;
+}
+
+/* Price Display */
+#currentPrice, #predictedPrice, #priceChange {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0;
+    text-align: center;
+}
+
+.price-up {
+    color: #28a745;
+}
+
+.price-down {
+    color: #dc3545;
+}
+
+/* Chart Containers */
+#stockChart, #indicatorChart {
+    width: 100%;
+    background-color: #fff;
+    border-radius: 4px;
+}
+
+/* Technical Indicators */
+#technicalIndicators .card {
+    transition: transform 0.2s;
+}
+
+#technicalIndicators .card:hover {
+    transform: translateY(-2px);
+}
+
+#technicalIndicators h6 {
+    color: #666;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#technicalIndicators p {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+    margin: 0;
+}
+
+/* Loading and Error States */
+#loadingIndicator {
+    text-align: center;
+    padding: 1rem;
+}
+
+#errorMessage {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+/* Footer */
+.footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    #currentPrice, #predictedPrice, #priceChange {
+        font-size: 1.5rem;
+    }
+}
