@@ -1,158 +1,117 @@
-console.log('Main.js loaded');
-
-// Wait for DOM and all scripts to load
-window.addEventListener('load', function() {
-    try {
-        console.log('Initializing application...');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Main.js loaded');
+    
+    const stockSelect = document.getElementById('stockSelect');
+    const stockChart = document.getElementById('stockChart');
+    
+    function updateChart(historyData) {
+        const trace1 = {
+            x: historyData.dates,
+            y: historyData.prices,
+            type: 'scatter',
+            name: 'Stock Price',
+            line: {
+                color: '#17BECF'
+            }
+        };
         
-        // Check if StockCharts is available
-        if (typeof window.StockCharts !== 'function') {
-            throw new Error('StockCharts class not loaded');
-        }
+        const trace2 = {
+            x: historyData.dates,
+            y: historyData.technical_indicators.sma20,
+            type: 'scatter',
+            name: 'SMA 20',
+            line: {
+                color: '#7F7F7F'
+            }
+        };
         
-        // Initialize charts
-        window.charts = new window.StockCharts();
-        console.log('StockCharts instance created');
+        const trace3 = {
+            x: historyData.dates,
+            y: historyData.technical_indicators.sma50,
+            type: 'scatter',
+            name: 'SMA 50',
+            line: {
+                color: '#FFA500'
+            }
+        };
         
-        // Get initial symbol
-        const stockSelect = document.getElementById('stockSelect');
-        if (!stockSelect) {
-            throw new Error('Stock select element not found');
-        }
+        const trace4 = {
+            x: historyData.dates,
+            y: historyData.technical_indicators.upper_band,
+            type: 'scatter',
+            name: 'Upper Band',
+            line: {
+                color: '#FF9999',
+                dash: 'dash'
+            }
+        };
         
-        window.currentSymbol = stockSelect.value;
-        console.log('Initial symbol:', window.currentSymbol);
+        const trace5 = {
+            x: historyData.dates,
+            y: historyData.technical_indicators.lower_band,
+            type: 'scatter',
+            name: 'Lower Band',
+            line: {
+                color: '#FF9999',
+                dash: 'dash'
+            },
+            fill: 'tonexty'
+        };
         
-        // Initialize charts
-        window.charts.initializePriceChart('stockChart');
-        window.charts.initializeIndicatorChart('indicatorChart');
+        const data = [trace1, trace2, trace3, trace4, trace5];
         
-        // Set up event listeners
-        stockSelect.addEventListener('change', function() {
-            window.currentSymbol = this.value;
-            console.log('Symbol changed to:', window.currentSymbol);
-            updateData();
-        });
+        const layout = {
+            title: 'Stock Price Analysis',
+            xaxis: {
+                title: 'Date',
+                rangeslider: {visible: true}
+            },
+            yaxis: {
+                title: 'Price ($)'
+            }
+        };
         
-        // Initial data load
-        updateData();
-        
-        // Update data every 5 minutes
-        setInterval(updateData, 300000);
-        
-        console.log('Application initialized successfully');
-    } catch (error) {
-        console.error('Error initializing application:', error);
-        showError('Failed to initialize application. Please refresh the page.');
+        Plotly.newPlot('stockChart', data, layout);
     }
-});
-
-function updateData() {
-    try {
-        console.log('Updating data for symbol:', window.currentSymbol);
-        showLoading(true);
+    
+    function updatePrices(predictionData) {
+        document.getElementById('currentPrice').textContent = 
+            `$${predictionData.current_price.toFixed(2)}`;
+        document.getElementById('predictedPrice').textContent = 
+            `$${predictionData.prediction.toFixed(2)}`;
+    }
+    
+    function updateData() {
+        const symbol = stockSelect.value;
+        
+        // Show loading state
+        stockChart.innerHTML = '<div class="text-center">Loading...</div>';
         
         // Fetch historical data
-        fetch(`/api/history/${window.currentSymbol}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
+        fetch(`/api/history/${symbol}`)
+            .then(response => response.json())
             .then(historyData => {
-                console.log('Received history data:', historyData);
+                updateChart(historyData);
                 
-                // Fetch prediction data
-                return fetch(`/api/predict/${window.currentSymbol}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(predictionData => {
-                        console.log('Received prediction data:', predictionData);
-                        
-                        // Update UI with both sets of data
-                        updateUI(historyData, predictionData);
-                    });
+                // Fetch prediction
+                return fetch(`/api/predict/${symbol}`);
+            })
+            .then(response => response.json())
+            .then(predictionData => {
+                updatePrices(predictionData);
             })
             .catch(error => {
-                console.error('Error fetching data:', error);
-                showError('Failed to fetch data. Please try again later.');
-            })
-            .finally(() => {
-                showLoading(false);
+                console.error('Error:', error);
+                stockChart.innerHTML = '<div class="text-center text-danger">Error loading data</div>';
             });
-    } catch (error) {
-        console.error('Error in updateData:', error);
-        showError('An error occurred while updating data.');
-        showLoading(false);
     }
-}
-
-function updateUI(historyData, predictionData) {
-    try {
-        // Update charts
-        window.charts.updatePriceChart({
-            dates: historyData.dates,
-            prices: historyData.prices,
-            predictions: predictionData
-        });
-        
-        window.charts.updateIndicatorChart({
-            dates: historyData.dates,
-            sma20: historyData.technical_indicators.sma20,
-            sma50: historyData.technical_indicators.sma50,
-            rsi: historyData.technical_indicators.rsi
-        });
-        
-        // Update metrics
-        const currentPriceElement = document.getElementById('currentPrice');
-        const predictedPriceElement = document.getElementById('predictedPrice');
-        const priceChangeElement = document.getElementById('priceChange');
-        const lastUpdateElement = document.getElementById('lastUpdate');
-        
-        if (!currentPriceElement || !predictedPriceElement || !priceChangeElement || !lastUpdateElement) {
-            throw new Error('Required UI elements not found');
-        }
-        
-        currentPriceElement.textContent = `$${predictionData.current_price.toFixed(2)}`;
-        predictedPriceElement.textContent = `$${predictionData.prediction.toFixed(2)}`;
-        
-        // Calculate and show price change
-        const priceChange = predictionData.prediction - predictionData.current_price;
-        const changePercent = (priceChange / predictionData.current_price * 100).toFixed(2);
-        priceChangeElement.textContent = `${priceChange >= 0 ? '▲' : '▼'} ${Math.abs(changePercent)}%`;
-        priceChangeElement.className = priceChange >= 0 ? 'price-up' : 'price-down';
-        
-        // Update last updated timestamp
-        lastUpdateElement.textContent = new Date().toLocaleString();
-        
-        console.log('UI updated successfully');
-    } catch (error) {
-        console.error('Error updating UI:', error);
-        showError('Failed to update display. Please refresh the page.');
-    }
-}
-
-function showLoading(show) {
-    const loadingElement = document.getElementById('loadingIndicator');
-    if (loadingElement) {
-        loadingElement.style.display = show ? 'block' : 'none';
-    }
-}
-
-function showError(message) {
-    const errorElement = document.getElementById('errorMessage');
-    if (errorElement) {
-        errorElement.textContent = message;
-        errorElement.style.display = 'block';
-        setTimeout(() => {
-            errorElement.style.display = 'none';
-        }, 5000);
-    } else {
-        console.error('Error element not found:', message);
-    }
-}
+    
+    // Initial update
+    updateData();
+    
+    // Update when stock selection changes
+    stockSelect.addEventListener('change', updateData);
+    
+    // Update every 5 minutes
+    setInterval(updateData, 300000);
+});
