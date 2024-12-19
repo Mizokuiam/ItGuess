@@ -5,6 +5,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import logging
 import ta
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +48,11 @@ def calculate_indicators(df):
 def index():
     """Render the main page"""
     return render_template('index.html', symbols=SUPPORTED_SYMBOLS)
+
+@app.route('/health')
+def health():
+    """Health check endpoint for Render"""
+    return jsonify({"status": "healthy"}), 200
 
 @app.route('/api/history/<symbol>')
 def get_history(symbol):
@@ -118,9 +124,6 @@ def predict_price(symbol):
         logger.error(f"Error in predict_price: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-# For local development
 if __name__ == '__main__':
-    app.run(debug=True)
-
-# For Vercel
-app = app
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
