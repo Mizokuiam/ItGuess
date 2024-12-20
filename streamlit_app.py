@@ -17,7 +17,7 @@ st.set_page_config(
 # Initialize services
 @st.cache_resource
 def get_services():
-    return TechnicalAnalysisService(), PredictionService(None)
+    return TechnicalAnalysisService(), PredictionService()
 
 technical_analysis, prediction_service = get_services()
 
