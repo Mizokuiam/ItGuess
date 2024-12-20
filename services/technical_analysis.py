@@ -99,28 +99,28 @@ class TechnicalAnalysisService:
                 return None
             
             # Calculate price changes
-            delta = prices.diff().dropna()
+            delta = prices.diff()
             
-            # Separate gains and losses
-            gains = delta.copy()
-            losses = delta.copy()
-            gains[gains < 0] = 0
-            losses[losses > 0] = 0
-            losses = abs(losses)
+            # Create separate DataFrames for gains and losses
+            gains = pd.DataFrame(index=delta.index)
+            losses = pd.DataFrame(index=delta.index)
+            gains['change'] = delta.where(delta > 0, 0)
+            losses['change'] = -delta.where(delta < 0, 0)
             
-            # Calculate average gains and losses
-            avg_gains = gains.rolling(window=periods, min_periods=1).mean()
-            avg_losses = losses.rolling(window=periods, min_periods=1).mean()
+            # Calculate rolling averages
+            gains_avg = gains['change'].rolling(window=periods, min_periods=1).mean()
+            losses_avg = losses['change'].rolling(window=periods, min_periods=1).mean()
             
             # Calculate RS and RSI
-            rs = avg_gains / avg_losses
+            rs = gains_avg / losses_avg
             rsi = 100 - (100 / (1 + rs))
             
             return rsi
+            
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")
             return None
-    
+
     def calculate_macd(self, prices, fast=12, slow=26, signal=9):
         """Calculate MACD (Moving Average Convergence/Divergence)"""
         try:
@@ -128,45 +128,50 @@ class TechnicalAnalysisService:
                 return None, None
             
             # Calculate EMAs
-            exp1 = prices.ewm(span=fast, min_periods=1, adjust=False).mean()
-            exp2 = prices.ewm(span=slow, min_periods=1, adjust=False).mean()
+            fast_ema = prices.ewm(span=fast, min_periods=1, adjust=False).mean()
+            slow_ema = prices.ewm(span=slow, min_periods=1, adjust=False).mean()
             
-            # Calculate MACD and signal line
-            macd = exp1 - exp2
-            signal_line = macd.ewm(span=signal, min_periods=1, adjust=False).mean()
+            # Calculate MACD line
+            macd_line = fast_ema - slow_ema
             
-            return macd, signal_line
+            # Calculate signal line
+            signal_line = macd_line.ewm(span=signal, min_periods=1, adjust=False).mean()
+            
+            return macd_line, signal_line
+            
         except Exception as e:
             print(f"Error calculating MACD: {str(e)}")
             return None, None
-    
+
     def calculate_ema(self, prices, period):
         """Calculate Exponential Moving Average"""
         try:
             if len(prices) < period:
                 return None
-            return prices.ewm(span=period, min_periods=1, adjust=False).mean()
+            
+            ema = prices.ewm(span=period, min_periods=1, adjust=False).mean()
+            return ema
+            
         except Exception as e:
             print(f"Error calculating EMA: {str(e)}")
             return None
-    
+
     def calculate_bollinger_bands(self, prices, period=20, num_std=2):
         """Calculate Bollinger Bands"""
         try:
             if len(prices) < period:
                 return None, None, None
             
-            # Calculate middle band (SMA)
-            middle = prices.rolling(window=period, min_periods=1).mean()
+            # Calculate rolling mean and standard deviation
+            rolling_mean = prices.rolling(window=period, min_periods=1).mean()
+            rolling_std = prices.rolling(window=period, min_periods=1).std()
             
-            # Calculate standard deviation
-            std = prices.rolling(window=period, min_periods=1).std()
+            # Calculate bands
+            upper_band = rolling_mean + (rolling_std * num_std)
+            lower_band = rolling_mean - (rolling_std * num_std)
             
-            # Calculate upper and lower bands
-            upper = middle + (std * num_std)
-            lower = middle - (std * num_std)
+            return upper_band, rolling_mean, lower_band
             
-            return upper, middle, lower
         except Exception as e:
             print(f"Error calculating Bollinger Bands: {str(e)}")
             return None, None, None
