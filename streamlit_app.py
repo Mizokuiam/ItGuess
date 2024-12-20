@@ -50,7 +50,7 @@ with st.sidebar:
     auto_refresh = st.checkbox("Auto-refresh data (5min)", value=True)
     if auto_refresh and (datetime.now() - st.session_state.last_update).seconds > 300:
         st.session_state.last_update = datetime.now()
-        st.experimental_rerun()
+        st.rerun()
 
 # Main content
 if symbol:
