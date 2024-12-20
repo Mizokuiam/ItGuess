@@ -9,9 +9,6 @@ from services.prediction import PredictionService
 # Initialize Flask app
 app = Flask(__name__)
 
-# Set secret key
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

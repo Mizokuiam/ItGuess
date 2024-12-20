@@ -53,33 +53,9 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('portfolio') }}">Portfolio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('watchlist') }}">Watchlist</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('education') }}">Education</a>
                     </li>
                 </ul>
-                <div class="d-flex">
-                    {% if current_user.is_authenticated %}
-                        <div class="dropdown">
-                            <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-person-circle"></i> {{ current_user.username }}
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="{{ url_for('profile') }}">Profile</a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Change Password</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
-                            </ul>
-                        </div>
-                    {% else %}
-                        <a href="{{ url_for('login') }}" class="btn btn-outline-light me-2">Login</a>
-                        <a href="{{ url_for('register') }}" class="btn btn-primary">Register</a>
-                    {% endif %}
-                </div>
             </div>
         </div>
     </nav>
