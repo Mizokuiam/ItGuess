@@ -31,6 +31,9 @@ ENV/
 *.swp
 *.swo
 
+# Streamlit
+.streamlit/secrets.toml
+
 # Logs
 *.log
 
@@ -46,6 +49,9 @@ ENV/
 # Node modules (if any)
 node_modules/
 
-# System Files
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# OS
 .DS_Store
 Thumbs.db

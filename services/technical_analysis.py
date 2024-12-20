@@ -35,80 +35,57 @@ class TechnicalAnalysisService:
         # Calculate MACD
         macd, signal = self.calculate_macd(self.data['Close'])
         
+        # Calculate EMAs
+        ema_20 = self.calculate_ema(self.data['Close'], 20)
+        ema_50 = self.calculate_ema(self.data['Close'], 50)
+        
+        # Calculate Bollinger Bands
+        bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(self.data['Close'])
+        
         # Calculate Volume SMA
         volume_sma = self.data['Volume'].rolling(window=20).mean()
 
         # Get the latest values
-        latest_rsi = rsi
-        latest_macd = macd
-        latest_signal = signal
-        latest_volume = self.data['Volume'].iloc[-1]
-        latest_volume_sma = volume_sma.iloc[-1]
-
-        # Return indicators dictionary
         return {
-            'RSI': latest_rsi,
-            'MACD': latest_macd,
-            'Signal': latest_signal,
-            'Volume': latest_volume,
-            'Volume_SMA': latest_volume_sma
+            'RSI': round(rsi, 2),
+            'MACD': round(macd, 2),
+            'Signal': round(signal, 2),
+            'EMA20': round(ema_20.iloc[-1], 2),
+            'EMA50': round(ema_50.iloc[-1], 2),
+            'BB_Upper': round(bb_upper.iloc[-1], 2),
+            'BB_Middle': round(bb_middle.iloc[-1], 2),
+            'BB_Lower': round(bb_lower.iloc[-1], 2),
+            'Volume': self.data['Volume'].iloc[-1],
+            'Volume_SMA': round(volume_sma.iloc[-1], 2)
         }
 
     def calculate_rsi(self, prices, periods=14):
         """Calculate Relative Strength Index"""
-        # Convert to numpy array if needed
-        if isinstance(prices, pd.Series):
-            prices = prices.values
-            
-        # Calculate price changes
-        deltas = np.diff(prices)
-        seed = deltas[:periods+1]
-        up = seed[seed >= 0].mean()
-        down = -seed[seed < 0].mean()
-        
-        if down != 0:
-            rs = up/down
-        else:
-            rs = 0
-        
-        rsi = np.zeros_like(prices)
-        rsi[:periods] = 100. - 100./(1. + rs)
-        
-        for i in range(periods, len(prices)):
-            delta = deltas[i-1]
-            
-            if delta > 0:
-                upval = delta
-                downval = 0.
-            else:
-                upval = 0.
-                downval = -delta
-            
-            up = (up*(periods-1) + upval)/periods
-            down = (down*(periods-1) + downval)/periods
-            
-            if down != 0:
-                rs = up/down
-            else:
-                rs = 0
-            
-            rsi[i] = 100. - 100./(1. + rs)
-        
-        return rsi[-1]  # Return the latest RSI value
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=periods).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=periods).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs.iloc[-1]))
     
     def calculate_macd(self, prices, fast=12, slow=26, signal=9):
         """Calculate MACD (Moving Average Convergence/Divergence)"""
-        # Convert to numpy array if needed
-        if isinstance(prices, pd.Series):
-            prices = prices.values
-            
-        # Calculate EMAs
-        exp1 = pd.Series(prices).ewm(span=fast, adjust=False).mean()
-        exp2 = pd.Series(prices).ewm(span=slow, adjust=False).mean()
+        exp1 = prices.ewm(span=fast, adjust=False).mean()
+        exp2 = prices.ewm(span=slow, adjust=False).mean()
         macd = exp1 - exp2
         signal_line = macd.ewm(span=signal, adjust=False).mean()
-        
-        return macd.iloc[-1], signal_line.iloc[-1]  # Return latest values
+        return macd.iloc[-1], signal_line.iloc[-1]
+    
+    def calculate_ema(self, prices, period):
+        """Calculate Exponential Moving Average"""
+        return prices.ewm(span=period, adjust=False).mean()
+    
+    def calculate_bollinger_bands(self, prices, period=20, num_std=2):
+        """Calculate Bollinger Bands"""
+        middle_band = prices.rolling(window=period).mean()
+        std_dev = prices.rolling(window=period).std()
+        upper_band = middle_band + (std_dev * num_std)
+        lower_band = middle_band - (std_dev * num_std)
+        return upper_band, middle_band, lower_band
 
     def calculate_all_indicators(self):
         """Calculate all technical indicators"""
