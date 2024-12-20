@@ -95,15 +95,18 @@ class TechnicalAnalysisService:
     def calculate_rsi(self, prices, periods=14):
         """Calculate Relative Strength Index"""
         try:
-            if len(prices) < periods:
+            if len(prices) < periods + 1:
                 return None
             
             # Calculate price changes
-            delta = prices.diff()
+            delta = prices.diff().dropna()
             
             # Separate gains and losses
-            gains = delta.where(delta > 0, 0)
-            losses = -delta.where(delta < 0, 0)
+            gains = delta.copy()
+            losses = delta.copy()
+            gains[gains < 0] = 0
+            losses[losses > 0] = 0
+            losses = abs(losses)
             
             # Calculate average gains and losses
             avg_gains = gains.rolling(window=periods, min_periods=1).mean()
@@ -121,10 +124,17 @@ class TechnicalAnalysisService:
     def calculate_macd(self, prices, fast=12, slow=26, signal=9):
         """Calculate MACD (Moving Average Convergence/Divergence)"""
         try:
-            exp1 = prices.ewm(span=fast, adjust=False, min_periods=1).mean()
-            exp2 = prices.ewm(span=slow, adjust=False, min_periods=1).mean()
+            if len(prices) < slow + signal:
+                return None, None
+            
+            # Calculate EMAs
+            exp1 = prices.ewm(span=fast, min_periods=1, adjust=False).mean()
+            exp2 = prices.ewm(span=slow, min_periods=1, adjust=False).mean()
+            
+            # Calculate MACD and signal line
             macd = exp1 - exp2
-            signal_line = macd.ewm(span=signal, adjust=False, min_periods=1).mean()
+            signal_line = macd.ewm(span=signal, min_periods=1, adjust=False).mean()
+            
             return macd, signal_line
         except Exception as e:
             print(f"Error calculating MACD: {str(e)}")
@@ -133,22 +143,33 @@ class TechnicalAnalysisService:
     def calculate_ema(self, prices, period):
         """Calculate Exponential Moving Average"""
         try:
-            return prices.ewm(span=period, adjust=False, min_periods=1).mean()
+            if len(prices) < period:
+                return None
+            return prices.ewm(span=period, min_periods=1, adjust=False).mean()
         except Exception as e:
             print(f"Error calculating EMA: {str(e)}")
-            return pd.Series([float('nan')] * len(prices))
+            return None
     
     def calculate_bollinger_bands(self, prices, period=20, num_std=2):
         """Calculate Bollinger Bands"""
         try:
-            middle_band = prices.rolling(window=period, min_periods=1).mean()
-            std_dev = prices.rolling(window=period, min_periods=1).std()
-            upper_band = middle_band + (std_dev * num_std)
-            lower_band = middle_band - (std_dev * num_std)
-            return upper_band, middle_band, lower_band
+            if len(prices) < period:
+                return None, None, None
+            
+            # Calculate middle band (SMA)
+            middle = prices.rolling(window=period, min_periods=1).mean()
+            
+            # Calculate standard deviation
+            std = prices.rolling(window=period, min_periods=1).std()
+            
+            # Calculate upper and lower bands
+            upper = middle + (std * num_std)
+            lower = middle - (std * num_std)
+            
+            return upper, middle, lower
         except Exception as e:
             print(f"Error calculating Bollinger Bands: {str(e)}")
-            return pd.Series([float('nan')] * len(prices)), pd.Series([float('nan')] * len(prices)), pd.Series([float('nan')] * len(prices))
+            return None, None, None
 
     def calculate_all_indicators(self):
         """Calculate all technical indicators"""

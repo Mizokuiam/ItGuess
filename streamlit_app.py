@@ -77,27 +77,27 @@ if symbol:
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         try:
-                            price = info.get('regularMarketPrice', 0)
-                            change = info.get('regularMarketChangePercent', 0)
+                            price = hist['Close'].iloc[-1] if not hist.empty else None
+                            change = ((price / hist['Close'].iloc[0] - 1) * 100) if not hist.empty and price else None
                             st.metric(
                                 "Current Price",
                                 f"${price:.2f}" if price else "N/A",
                                 f"{change:.2f}%" if change else "N/A"
                             )
-                        except (KeyError, TypeError):
+                        except (KeyError, TypeError, IndexError):
                             st.metric("Current Price", "N/A", "N/A")
                     
                     with col2:
                         try:
-                            volume = info.get('volume', 0)
-                            st.metric("Volume", f"{volume:,}" if volume else "N/A")
-                        except (KeyError, TypeError):
+                            volume = hist['Volume'].iloc[-1] if not hist.empty else None
+                            st.metric("Volume", f"{int(volume):,}" if volume else "N/A")
+                        except (KeyError, TypeError, IndexError):
                             st.metric("Volume", "N/A")
                     
                     with col3:
                         try:
-                            market_cap = info.get('marketCap', 0)
-                            st.metric("Market Cap", f"${market_cap:,}" if market_cap else "N/A")
+                            market_cap = info.get('marketCap', None)
+                            st.metric("Market Cap", f"${int(market_cap):,}" if market_cap else "N/A")
                         except (KeyError, TypeError):
                             st.metric("Market Cap", "N/A")
                     
@@ -188,18 +188,27 @@ if symbol:
                                 # Make predictions
                                 predictions = prediction_service.predict(period)
                                 
-                                if predictions:
+                                if predictions and isinstance(predictions, dict):
                                     col1, col2 = st.columns([2, 1])
                                     with col1:
                                         st.subheader("Price Predictions")
                                         for model, pred in predictions.items():
-                                            st.metric(f"{model} Prediction", f"${pred:.2f}")
+                                            if isinstance(pred, (int, float)):
+                                                st.metric(f"{model} Prediction", f"${pred:.2f}")
+                                            else:
+                                                st.metric(f"{model} Prediction", "N/A")
                                     
                                     with col2:
                                         st.subheader("Model Metrics")
                                         metrics = prediction_service.metrics
-                                        for model, metric in metrics.items():
-                                            st.metric(f"{model} Accuracy", f"{metric:.1%}")
+                                        if metrics and isinstance(metrics, dict):
+                                            for model, metric in metrics.items():
+                                                if isinstance(metric, (int, float)):
+                                                    st.metric(f"{model} Accuracy", f"{metric:.1%}")
+                                                else:
+                                                    st.metric(f"{model} Accuracy", "N/A")
+                                        else:
+                                            st.warning("Model metrics not available")
                                 else:
                                     st.warning("Could not generate predictions. Please try again.")
                             else:
