@@ -23,69 +23,93 @@ class TechnicalAnalysisService:
 
     def calculate_indicators(self, data=None):
         """Calculate main technical indicators and return them as a dictionary"""
-        if data is not None:
-            self.data = data
-        
-        if self.data.empty:
+        try:
+            if data is not None:
+                self.data = data
+            
+            if self.data is None or self.data.empty:
+                return {}
+
+            # Ensure we have enough data
+            if len(self.data) < 60:  # Need at least 60 days for calculations
+                return {}
+
+            # Calculate RSI
+            rsi = self.calculate_rsi(self.data['Close'])
+            
+            # Calculate MACD
+            macd, signal = self.calculate_macd(self.data['Close'])
+            
+            # Calculate EMAs
+            ema_20 = self.calculate_ema(self.data['Close'], 20)
+            ema_50 = self.calculate_ema(self.data['Close'], 50)
+            
+            # Calculate Bollinger Bands
+            bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(self.data['Close'])
+            
+            # Calculate Volume SMA
+            volume_sma = self.data['Volume'].rolling(window=20, min_periods=1).mean()
+
+            # Get the latest values
+            return {
+                'RSI': round(float(rsi), 2) if not pd.isna(rsi) else 'N/A',
+                'MACD': round(float(macd), 2) if not pd.isna(macd) else 'N/A',
+                'Signal': round(float(signal), 2) if not pd.isna(signal) else 'N/A',
+                'EMA20': round(float(ema_20.iloc[-1]), 2) if not pd.isna(ema_20.iloc[-1]) else 'N/A',
+                'EMA50': round(float(ema_50.iloc[-1]), 2) if not pd.isna(ema_50.iloc[-1]) else 'N/A',
+                'BB_Upper': round(float(bb_upper.iloc[-1]), 2) if not pd.isna(bb_upper.iloc[-1]) else 'N/A',
+                'BB_Middle': round(float(bb_middle.iloc[-1]), 2) if not pd.isna(bb_middle.iloc[-1]) else 'N/A',
+                'BB_Lower': round(float(bb_lower.iloc[-1]), 2) if not pd.isna(bb_lower.iloc[-1]) else 'N/A',
+                'Volume': int(self.data['Volume'].iloc[-1]) if not pd.isna(self.data['Volume'].iloc[-1]) else 'N/A',
+                'Volume_SMA': round(float(volume_sma.iloc[-1]), 2) if not pd.isna(volume_sma.iloc[-1]) else 'N/A'
+            }
+        except Exception as e:
+            print(f"Error calculating indicators: {str(e)}")
             return {}
-
-        # Calculate RSI
-        rsi = self.calculate_rsi(self.data['Close'])
-        
-        # Calculate MACD
-        macd, signal = self.calculate_macd(self.data['Close'])
-        
-        # Calculate EMAs
-        ema_20 = self.calculate_ema(self.data['Close'], 20)
-        ema_50 = self.calculate_ema(self.data['Close'], 50)
-        
-        # Calculate Bollinger Bands
-        bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(self.data['Close'])
-        
-        # Calculate Volume SMA
-        volume_sma = self.data['Volume'].rolling(window=20).mean()
-
-        # Get the latest values
-        return {
-            'RSI': round(rsi, 2),
-            'MACD': round(macd, 2),
-            'Signal': round(signal, 2),
-            'EMA20': round(ema_20.iloc[-1], 2),
-            'EMA50': round(ema_50.iloc[-1], 2),
-            'BB_Upper': round(bb_upper.iloc[-1], 2),
-            'BB_Middle': round(bb_middle.iloc[-1], 2),
-            'BB_Lower': round(bb_lower.iloc[-1], 2),
-            'Volume': self.data['Volume'].iloc[-1],
-            'Volume_SMA': round(volume_sma.iloc[-1], 2)
-        }
 
     def calculate_rsi(self, prices, periods=14):
         """Calculate Relative Strength Index"""
-        delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=periods).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=periods).mean()
-        rs = gain / loss
-        return 100 - (100 / (1 + rs.iloc[-1]))
+        try:
+            delta = prices.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=periods, min_periods=1).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=periods, min_periods=1).mean()
+            rs = gain / loss
+            return 100 - (100 / (1 + rs.iloc[-1]))
+        except Exception as e:
+            print(f"Error calculating RSI: {str(e)}")
+            return float('nan')
     
     def calculate_macd(self, prices, fast=12, slow=26, signal=9):
         """Calculate MACD (Moving Average Convergence/Divergence)"""
-        exp1 = prices.ewm(span=fast, adjust=False).mean()
-        exp2 = prices.ewm(span=slow, adjust=False).mean()
-        macd = exp1 - exp2
-        signal_line = macd.ewm(span=signal, adjust=False).mean()
-        return macd.iloc[-1], signal_line.iloc[-1]
+        try:
+            exp1 = prices.ewm(span=fast, adjust=False, min_periods=1).mean()
+            exp2 = prices.ewm(span=slow, adjust=False, min_periods=1).mean()
+            macd = exp1 - exp2
+            signal_line = macd.ewm(span=signal, adjust=False, min_periods=1).mean()
+            return macd.iloc[-1], signal_line.iloc[-1]
+        except Exception as e:
+            print(f"Error calculating MACD: {str(e)}")
+            return float('nan'), float('nan')
     
     def calculate_ema(self, prices, period):
         """Calculate Exponential Moving Average"""
-        return prices.ewm(span=period, adjust=False).mean()
+        try:
+            return prices.ewm(span=period, adjust=False, min_periods=1).mean()
+        except Exception as e:
+            print(f"Error calculating EMA: {str(e)}")
+            return pd.Series([float('nan')] * len(prices))
     
     def calculate_bollinger_bands(self, prices, period=20, num_std=2):
         """Calculate Bollinger Bands"""
-        middle_band = prices.rolling(window=period).mean()
-        std_dev = prices.rolling(window=period).std()
-        upper_band = middle_band + (std_dev * num_std)
-        lower_band = middle_band - (std_dev * num_std)
-        return upper_band, middle_band, lower_band
+        try:
+            middle_band = prices.rolling(window=period, min_periods=1).mean()
+            std_dev = prices.rolling(window=period, min_periods=1).std()
+            upper_band = middle_band + (std_dev * num_std)
+            lower_band = middle_band - (std_dev * num_std)
+            return upper_band, middle_band, lower_band
+        except Exception as e:
+            print(f"Error calculating Bollinger Bands: {str(e)}")
+            return pd.Series([float('nan')] * len(prices)), pd.Series([float('nan')] * len(prices)), pd.Series([float('nan')] * len(prices))
 
     def calculate_all_indicators(self):
         """Calculate all technical indicators"""
@@ -107,49 +131,79 @@ class TechnicalAnalysisService:
     
     def calculate_moving_averages(self):
         """Calculate various moving averages"""
-        self.data['SMA20'] = self.data['Close'].rolling(window=20).mean()
-        self.data['SMA50'] = self.data['Close'].rolling(window=50).mean()
-        self.data['EMA12'] = self.data['Close'].ewm(span=12).mean()
-        self.data['EMA26'] = self.data['Close'].ewm(span=26).mean()
+        self.data['SMA20'] = self.data['Close'].rolling(window=20, min_periods=1).mean()
+        self.data['SMA50'] = self.data['Close'].rolling(window=50, min_periods=1).mean()
+        self.data['EMA12'] = self.data['Close'].ewm(span=12, adjust=False, min_periods=1).mean()
+        self.data['EMA26'] = self.data['Close'].ewm(span=26, adjust=False, min_periods=1).mean()
         
     def calculate_rsi(self, period=14):
         """Calculate Relative Strength Index"""
-        delta = self.data['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        self.data['RSI'] = 100 - (100 / (1 + rs))
+        try:
+            delta = self.data['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
+            rs = gain / loss
+            self.data['RSI'] = 100 - (100 / (1 + rs))
+        except Exception as e:
+            print(f"Error calculating RSI: {str(e)}")
+            self.data['RSI'] = float('nan')
         
     def calculate_macd(self):
         """Calculate MACD indicator"""
-        exp1 = self.data['Close'].ewm(span=12, adjust=False).mean()
-        exp2 = self.data['Close'].ewm(span=26, adjust=False).mean()
-        self.data['MACD'] = exp1 - exp2
-        self.data['Signal_Line'] = self.data['MACD'].ewm(span=9, adjust=False).mean()
+        try:
+            exp1 = self.data['Close'].ewm(span=12, adjust=False, min_periods=1).mean()
+            exp2 = self.data['Close'].ewm(span=26, adjust=False, min_periods=1).mean()
+            self.data['MACD'] = exp1 - exp2
+            self.data['Signal_Line'] = self.data['MACD'].ewm(span=9, adjust=False, min_periods=1).mean()
+        except Exception as e:
+            print(f"Error calculating MACD: {str(e)}")
+            self.data['MACD'] = float('nan')
+            self.data['Signal_Line'] = float('nan')
         
     def calculate_bollinger_bands(self, period=20, std_dev=2):
         """Calculate Bollinger Bands"""
-        self.data['BB_Middle'] = self.data['Close'].rolling(window=period).mean()
-        rolling_std = self.data['Close'].rolling(window=period).std()
-        self.data['BB_Upper'] = self.data['BB_Middle'] + (rolling_std * std_dev)
-        self.data['BB_Lower'] = self.data['BB_Middle'] - (rolling_std * std_dev)
+        try:
+            self.data['BB_Middle'] = self.data['Close'].rolling(window=period, min_periods=1).mean()
+            rolling_std = self.data['Close'].rolling(window=period, min_periods=1).std()
+            self.data['BB_Upper'] = self.data['BB_Middle'] + (rolling_std * std_dev)
+            self.data['BB_Lower'] = self.data['BB_Middle'] - (rolling_std * std_dev)
+        except Exception as e:
+            print(f"Error calculating Bollinger Bands: {str(e)}")
+            self.data['BB_Middle'] = float('nan')
+            self.data['BB_Upper'] = float('nan')
+            self.data['BB_Lower'] = float('nan')
         
     def calculate_stochastic(self, period=14):
         """Calculate Stochastic Oscillator"""
-        low_min = self.data['Low'].rolling(window=period).min()
-        high_max = self.data['High'].rolling(window=period).max()
-        self.data['%K'] = ((self.data['Close'] - low_min) / (high_max - low_min)) * 100
-        self.data['%D'] = self.data['%K'].rolling(window=3).mean()
+        try:
+            low_min = self.data['Low'].rolling(window=period, min_periods=1).min()
+            high_max = self.data['High'].rolling(window=period, min_periods=1).max()
+            self.data['%K'] = ((self.data['Close'] - low_min) / (high_max - low_min)) * 100
+            self.data['%D'] = self.data['%K'].rolling(window=3, min_periods=1).mean()
+        except Exception as e:
+            print(f"Error calculating Stochastic Oscillator: {str(e)}")
+            self.data['%K'] = float('nan')
+            self.data['%D'] = float('nan')
         
     def calculate_support_resistance(self, window=20):
         """Calculate Support and Resistance levels"""
-        self.data['Support'] = self.data['Low'].rolling(window=window).min()
-        self.data['Resistance'] = self.data['High'].rolling(window=window).max()
+        try:
+            self.data['Support'] = self.data['Low'].rolling(window=window, min_periods=1).min()
+            self.data['Resistance'] = self.data['High'].rolling(window=window, min_periods=1).max()
+        except Exception as e:
+            print(f"Error calculating Support and Resistance levels: {str(e)}")
+            self.data['Support'] = float('nan')
+            self.data['Resistance'] = float('nan')
         
     def calculate_volume_indicators(self):
         """Calculate Volume-based indicators"""
-        self.data['OBV'] = (np.sign(self.data['Close'].diff()) * self.data['Volume']).cumsum()
-        self.data['Volume_SMA'] = self.data['Volume'].rolling(window=20).mean()
+        try:
+            self.data['OBV'] = (np.sign(self.data['Close'].diff()) * self.data['Volume']).cumsum()
+            self.data['Volume_SMA'] = self.data['Volume'].rolling(window=20, min_periods=1).mean()
+        except Exception as e:
+            print(f"Error calculating Volume-based indicators: {str(e)}")
+            self.data['OBV'] = float('nan')
+            self.data['Volume_SMA'] = float('nan')
         
     def get_trading_signals(self):
         """Generate trading signals based on technical indicators"""

@@ -31,16 +31,23 @@ class PredictionService:
     
     def prepare_data(self, data, lookback=60):
         """Prepare data for models"""
-        scaled_data = self.scaler.fit_transform(data.reshape(-1, 1))
-        x_train = []
-        y_train = []
-        
-        for i in range(lookback, len(scaled_data)):
-            x_train.append(scaled_data[i-lookback:i, 0])
-            y_train.append(scaled_data[i, 0])
+        try:
+            if len(data) < lookback:
+                return None, None
+                
+            scaled_data = self.scaler.fit_transform(data.reshape(-1, 1))
+            x_train = []
+            y_train = []
             
-        return np.array(x_train), np.array(y_train)
-    
+            for i in range(lookback, len(scaled_data)):
+                x_train.append(scaled_data[i-lookback:i, 0])
+                y_train.append(scaled_data[i, 0])
+                
+            return np.array(x_train), np.array(y_train)
+        except Exception as e:
+            print(f"Error preparing data: {str(e)}")
+            return None, None
+
     def train_models(self, symbol):
         """Train all prediction models"""
         try:
@@ -58,60 +65,47 @@ class PredictionService:
             data = hist['Close'].values
             x_train, y_train = self.prepare_data(data)
             
-            # Train LSTM
-            x_train_lstm = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-            self.lstm_model.fit(x_train_lstm, y_train, batch_size=32, epochs=10, verbose=0)
+            if x_train is None or y_train is None:
+                raise ValueError("Not enough data for training")
             
-            # Prepare data for RF and LR (flatten the sequences)
-            x_train_flat = x_train.reshape(x_train.shape[0], -1)
+            # Reshape data for LSTM
+            x_train_lstm = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
+            
+            # Train LSTM
+            self.lstm_model.fit(x_train_lstm, y_train, epochs=50, batch_size=32, verbose=0)
             
             # Train Random Forest
-            self.rf_model.fit(x_train_flat, y_train)
+            self.rf_model.fit(x_train, y_train)
             
             # Train Linear Regression
-            self.lr_model.fit(x_train_flat, y_train)
+            self.lr_model.fit(x_train, y_train)
             
-            # Calculate performance metrics
-            self._calculate_metrics(x_train_lstm, x_train_flat, y_train)
+            # Calculate metrics
+            self.metrics = {
+                'LSTM': self._calculate_model_accuracy(self.lstm_model, x_train_lstm, y_train),
+                'Random Forest': self._calculate_model_accuracy(self.rf_model, x_train, y_train),
+                'Linear Regression': self._calculate_model_accuracy(self.lr_model, x_train, y_train)
+            }
             
             return True
-            
         except Exception as e:
             print(f"Error training models: {str(e)}")
             return False
-    
-    def _calculate_metrics(self, x_lstm, x_flat, y_true):
-        """Calculate performance metrics for all models"""
-        # LSTM predictions
-        lstm_pred = self.lstm_model.predict(x_lstm, verbose=0)
-        lstm_pred = self.scaler.inverse_transform(lstm_pred)
-        
-        # RF predictions
-        rf_pred = self.rf_model.predict(x_flat)
-        rf_pred = self.scaler.inverse_transform(rf_pred.reshape(-1, 1))
-        
-        # LR predictions
-        lr_pred = self.lr_model.predict(x_flat)
-        lr_pred = self.scaler.inverse_transform(lr_pred.reshape(-1, 1))
-        
-        # True values
-        y_true = self.scaler.inverse_transform(y_true.reshape(-1, 1))
-        
-        # Calculate metrics
-        self.metrics = {
-            'lstm': {
-                'mse': mean_squared_error(y_true, lstm_pred),
-                'r2': r2_score(y_true, lstm_pred)
-            },
-            'rf': {
-                'mse': mean_squared_error(y_true, rf_pred),
-                'r2': r2_score(y_true, rf_pred)
-            },
-            'lr': {
-                'mse': mean_squared_error(y_true, lr_pred),
-                'r2': r2_score(y_true, lr_pred)
-            }
-        }
+            
+    def _calculate_model_accuracy(self, model, X, y):
+        """Calculate model accuracy"""
+        try:
+            if isinstance(model, Sequential):  # LSTM model
+                y_pred = model.predict(X, verbose=0)
+            else:
+                y_pred = model.predict(X)
+            
+            # Calculate R² score
+            r2 = r2_score(y, y_pred)
+            return max(0, min(1, r2))  # Ensure score is between 0 and 1
+        except Exception as e:
+            print(f"Error calculating model accuracy: {str(e)}")
+            return 0.0
     
     def get_prediction(self, symbol, period='1d'):
         """Get price predictions from all models"""
@@ -187,9 +181,9 @@ class PredictionService:
             
         # Use R² scores to calculate confidence
         r2_scores = [
-            self.metrics['lstm']['r2'],
-            self.metrics['rf']['r2'],
-            self.metrics['lr']['r2']
+            self.metrics['LSTM'],
+            self.metrics['Random Forest'],
+            self.metrics['Linear Regression']
         ]
         avg_r2 = np.mean(r2_scores)
         confidence = min(95, max(60, avg_r2 * 100))  # Scale between 60-95%
