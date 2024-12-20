@@ -47,11 +47,12 @@ if symbol:
             @st.cache_data(ttl=300)  # Cache for 5 minutes
             def get_stock_data(symbol):
                 stock = yf.Ticker(symbol)
-                info = stock.info
+                info = dict(stock.info)  # Convert info to a regular dictionary
                 hist = stock.history(period="1y")
-                return stock, info, hist
-
-            stock, info, hist = get_stock_data(symbol)
+                return info, hist  # Return only the necessary data
+            
+            # Get data
+            info, hist = get_stock_data(symbol)
             
             if not hist.empty and len(hist) > 20:  # Ensure we have enough data
                 # Display current price and company info
