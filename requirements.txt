@@ -10,3 +10,4 @@ requests==2.31.0
 gunicorn==21.2.0
 Werkzeug==2.0.1
 Jinja2==3.0.3
+pandas-ta==0.3.14b0
