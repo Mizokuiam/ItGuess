@@ -16,6 +16,7 @@ class PredictionService:
         self.rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
         self.lr_model = LinearRegression()
         self.metrics = {}
+        self.data = None
         
     def _build_lstm_model(self):
         """Build and return the LSTM model"""
@@ -49,6 +50,9 @@ class PredictionService:
             
             if hist.empty:
                 raise ValueError(f"No historical data available for {symbol}")
+            
+            # Store data
+            self.data = hist
             
             # Prepare data
             data = hist['Close'].values
@@ -233,3 +237,36 @@ class PredictionService:
             'metrics': {},
             'date': datetime.now().strftime('%Y-%m-%d')
         }
+    
+    def predict(self, period='1d'):
+        """Make predictions using all models"""
+        if not hasattr(self, 'data') or self.data is None:
+            return None
+            
+        predictions = {}
+        try:
+            # Prepare latest data for prediction
+            latest_data = self.data['Close'].values[-60:]  # Get last 60 days
+            latest_data = self.scaler.transform(latest_data.reshape(-1, 1))
+            latest_data = latest_data.reshape(1, 60, 1)  # Reshape for LSTM
+            
+            # LSTM prediction
+            lstm_pred = self.lstm_model.predict(latest_data)
+            predictions['LSTM'] = float(self.scaler.inverse_transform(lstm_pred)[0, 0])
+            
+            # Random Forest prediction
+            rf_input = latest_data.reshape(1, -1)
+            rf_pred = self.rf_model.predict(rf_input)
+            predictions['Random Forest'] = float(self.scaler.inverse_transform([[rf_pred[0]]])[0, 0])
+            
+            # Linear Regression prediction
+            lr_pred = self.lr_model.predict(rf_input)
+            predictions['Linear Regression'] = float(self.scaler.inverse_transform([[lr_pred[0]]])[0, 0])
+            
+            # Ensemble prediction (average of all models)
+            predictions['Ensemble'] = sum(predictions.values()) / len(predictions)
+            
+            return predictions
+        except Exception as e:
+            print(f"Error making predictions: {str(e)}")
+            return None
