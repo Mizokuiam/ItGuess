@@ -28,56 +28,95 @@ class TechnicalAnalysisService:
                 self.data = data
             
             if self.data is None or self.data.empty:
-                return {}
+                return None
 
             # Ensure we have enough data
             if len(self.data) < 60:  # Need at least 60 days for calculations
-                return {}
+                return None
+
+            # Create a copy of the data to avoid modifying the original
+            df = self.data.copy()
 
             # Calculate RSI
-            rsi = self.calculate_rsi(self.data['Close'])
+            rsi = self.calculate_rsi(df['Close'])
             
             # Calculate MACD
-            macd, signal = self.calculate_macd(self.data['Close'])
+            macd, signal = self.calculate_macd(df['Close'])
             
             # Calculate EMAs
-            ema_20 = self.calculate_ema(self.data['Close'], 20)
-            ema_50 = self.calculate_ema(self.data['Close'], 50)
+            ema_20 = self.calculate_ema(df['Close'], 20)
+            ema_50 = self.calculate_ema(df['Close'], 50)
             
             # Calculate Bollinger Bands
-            bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(self.data['Close'])
+            bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(df['Close'])
             
             # Calculate Volume SMA
-            volume_sma = self.data['Volume'].rolling(window=20, min_periods=1).mean()
+            volume_sma = df['Volume'].rolling(window=20, min_periods=1).mean()
 
-            # Get the latest values
-            return {
-                'RSI': round(float(rsi), 2) if not pd.isna(rsi) else 'N/A',
-                'MACD': round(float(macd), 2) if not pd.isna(macd) else 'N/A',
-                'Signal': round(float(signal), 2) if not pd.isna(signal) else 'N/A',
-                'EMA20': round(float(ema_20.iloc[-1]), 2) if not pd.isna(ema_20.iloc[-1]) else 'N/A',
-                'EMA50': round(float(ema_50.iloc[-1]), 2) if not pd.isna(ema_50.iloc[-1]) else 'N/A',
-                'BB_Upper': round(float(bb_upper.iloc[-1]), 2) if not pd.isna(bb_upper.iloc[-1]) else 'N/A',
-                'BB_Middle': round(float(bb_middle.iloc[-1]), 2) if not pd.isna(bb_middle.iloc[-1]) else 'N/A',
-                'BB_Lower': round(float(bb_lower.iloc[-1]), 2) if not pd.isna(bb_lower.iloc[-1]) else 'N/A',
-                'Volume': int(self.data['Volume'].iloc[-1]) if not pd.isna(self.data['Volume'].iloc[-1]) else 'N/A',
-                'Volume_SMA': round(float(volume_sma.iloc[-1]), 2) if not pd.isna(volume_sma.iloc[-1]) else 'N/A'
-            }
+            # Get the latest values and handle NaN values
+            result = {}
+            
+            # Helper function to safely get the latest value
+            def get_latest_value(series):
+                if series is None or isinstance(series, float):
+                    return series
+                if isinstance(series, pd.Series) and not series.empty:
+                    latest = series.iloc[-1]
+                    return None if pd.isna(latest) else latest
+                return None
+
+            # Add indicators to result dict
+            result['RSI'] = get_latest_value(rsi)
+            result['MACD'] = get_latest_value(macd)
+            result['Signal'] = get_latest_value(signal)
+            result['EMA20'] = get_latest_value(ema_20)
+            result['EMA50'] = get_latest_value(ema_50)
+            result['BB_Upper'] = get_latest_value(bb_upper)
+            result['BB_Middle'] = get_latest_value(bb_middle)
+            result['BB_Lower'] = get_latest_value(bb_lower)
+            result['Volume'] = get_latest_value(df['Volume'])
+            result['Volume_SMA'] = get_latest_value(volume_sma)
+
+            # Round numeric values
+            for key in result:
+                if result[key] is not None and not pd.isna(result[key]):
+                    if key == 'Volume':
+                        result[key] = int(result[key])
+                    else:
+                        result[key] = round(float(result[key]), 2)
+                else:
+                    result[key] = 'N/A'
+
+            return result
         except Exception as e:
             print(f"Error calculating indicators: {str(e)}")
-            return {}
+            return None
 
     def calculate_rsi(self, prices, periods=14):
         """Calculate Relative Strength Index"""
         try:
+            if len(prices) < periods:
+                return None
+            
+            # Calculate price changes
             delta = prices.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=periods, min_periods=1).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=periods, min_periods=1).mean()
-            rs = gain / loss
-            return 100 - (100 / (1 + rs.iloc[-1]))
+            
+            # Separate gains and losses
+            gains = delta.where(delta > 0, 0)
+            losses = -delta.where(delta < 0, 0)
+            
+            # Calculate average gains and losses
+            avg_gains = gains.rolling(window=periods, min_periods=1).mean()
+            avg_losses = losses.rolling(window=periods, min_periods=1).mean()
+            
+            # Calculate RS and RSI
+            rs = avg_gains / avg_losses
+            rsi = 100 - (100 / (1 + rs))
+            
+            return rsi
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")
-            return float('nan')
+            return None
     
     def calculate_macd(self, prices, fast=12, slow=26, signal=9):
         """Calculate MACD (Moving Average Convergence/Divergence)"""
@@ -86,10 +125,10 @@ class TechnicalAnalysisService:
             exp2 = prices.ewm(span=slow, adjust=False, min_periods=1).mean()
             macd = exp1 - exp2
             signal_line = macd.ewm(span=signal, adjust=False, min_periods=1).mean()
-            return macd.iloc[-1], signal_line.iloc[-1]
+            return macd, signal_line
         except Exception as e:
             print(f"Error calculating MACD: {str(e)}")
-            return float('nan'), float('nan')
+            return None, None
     
     def calculate_ema(self, prices, period):
         """Calculate Exponential Moving Average"""

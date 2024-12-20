@@ -118,65 +118,133 @@ if symbol:
                     with st.spinner('Calculating technical indicators...'):
                         st.header("Technical Analysis")
                         
-                        # Initialize technical analysis with current symbol and data
-                        technical_analysis.symbol = symbol
-                        technical_analysis.data = hist
-                        
-                        # Calculate indicators
-                        indicators = technical_analysis.calculate_indicators()
-                        
-                        # Display indicators in columns
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("RSI", f"{indicators.get('RSI', 'N/A')}")
-                            st.metric("MACD", f"{indicators.get('MACD', 'N/A')}")
-                        with col2:
-                            st.metric("EMA (20)", f"{indicators.get('EMA20', 'N/A')}")
-                            st.metric("EMA (50)", f"{indicators.get('EMA50', 'N/A')}")
-                        with col3:
-                            st.metric("Volume SMA", f"{indicators.get('Volume_SMA', 'N/A'):,.0f}")
+                        try:
+                            # Initialize technical analysis with current symbol and data
+                            technical_analysis.symbol = symbol
+                            technical_analysis.data = hist.copy()  # Create a copy of the data
+                            
+                            # Calculate indicators
+                            indicators = technical_analysis.calculate_indicators()
+                            
+                            if indicators:  # Check if we got valid indicators
+                                # Display indicators in columns
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("RSI", str(indicators.get('RSI', 'N/A')))
+                                    st.metric("MACD", str(indicators.get('MACD', 'N/A')))
+                                with col2:
+                                    st.metric("EMA (20)", str(indicators.get('EMA20', 'N/A')))
+                                    st.metric("EMA (50)", str(indicators.get('EMA50', 'N/A')))
+                                with col3:
+                                    volume_sma = indicators.get('Volume_SMA', 'N/A')
+                                    st.metric("Volume SMA", f"{volume_sma:,.0f}" if isinstance(volume_sma, (int, float)) else "N/A")
+                                
+                                # Add technical analysis chart
+                                fig = go.Figure()
+                                
+                                # Add price line
+                                fig.add_trace(go.Scatter(
+                                    x=hist.index,
+                                    y=hist['Close'],
+                                    name="Price",
+                                    line=dict(color='blue')
+                                ))
+                                
+                                # Add EMAs if available
+                                if 'EMA20' in indicators and 'EMA50' in indicators:
+                                    fig.add_trace(go.Scatter(
+                                        x=hist.index,
+                                        y=hist['Close'].ewm(span=20, adjust=False).mean(),
+                                        name="EMA 20",
+                                        line=dict(color='orange')
+                                    ))
+                                    fig.add_trace(go.Scatter(
+                                        x=hist.index,
+                                        y=hist['Close'].ewm(span=50, adjust=False).mean(),
+                                        name="EMA 50",
+                                        line=dict(color='red')
+                                    ))
+                                
+                                fig.update_layout(
+                                    title="Technical Analysis Chart",
+                                    xaxis_title="Date",
+                                    yaxis_title="Price ($)",
+                                    hovermode='x unified'
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.warning("Could not calculate technical indicators. Not enough data points.")
+                        except Exception as e:
+                            st.error(f"Error in technical analysis: {str(e)}")
                 
                 with tab3:
                     # Price Prediction
                     with st.spinner('Generating price predictions...'):
                         st.header("Price Prediction")
                         
-                        # Train prediction models
-                        prediction_service.train_models(symbol)
-                        
-                        # Make predictions
-                        predictions = prediction_service.predict(period)
-                        
-                        if predictions:
-                            col1, col2 = st.columns([2, 1])
-                            with col1:
-                                st.subheader("Price Predictions")
-                                for model, pred in predictions.items():
-                                    st.metric(f"{model} Prediction", f"${pred:.2f}")
-                            
-                            with col2:
-                                st.subheader("Model Metrics")
-                                metrics = prediction_service.metrics
-                                for model, metric in metrics.items():
-                                    st.metric(f"{model} Accuracy", f"{metric:.2%}")
+                        try:
+                            # Train prediction models
+                            if prediction_service.train_models(symbol):
+                                # Make predictions
+                                predictions = prediction_service.predict(period)
+                                
+                                if predictions:
+                                    col1, col2 = st.columns([2, 1])
+                                    with col1:
+                                        st.subheader("Price Predictions")
+                                        for model, pred in predictions.items():
+                                            st.metric(f"{model} Prediction", f"${pred:.2f}")
+                                    
+                                    with col2:
+                                        st.subheader("Model Metrics")
+                                        metrics = prediction_service.metrics
+                                        for model, metric in metrics.items():
+                                            st.metric(f"{model} Accuracy", f"{metric:.1%}")
+                                else:
+                                    st.warning("Could not generate predictions. Please try again.")
+                            else:
+                                st.warning("Could not train prediction models. Not enough data points.")
+                        except Exception as e:
+                            st.error(f"Error in price prediction: {str(e)}")
                 
                 with tab4:
                     # Live Chart
                     with st.spinner('Loading live chart...'):
                         st.header("Live Chart")
                         
-                        # Create candlestick chart
-                        fig = go.Figure(data=[go.Candlestick(x=hist.index,
-                                                           open=hist['Open'],
-                                                           high=hist['High'],
-                                                           low=hist['Low'],
-                                                           close=hist['Close'])])
-                        
-                        fig.update_layout(title=f'{symbol} Stock Price',
-                                        yaxis_title='Price',
-                                        xaxis_title='Date')
-                        
-                        st.plotly_chart(fig, use_container_width=True)
+                        try:
+                            # Create candlestick chart
+                            fig = go.Figure(data=[go.Candlestick(
+                                x=hist.index,
+                                open=hist['Open'],
+                                high=hist['High'],
+                                low=hist['Low'],
+                                close=hist['Close'],
+                                name="OHLC"
+                            )])
+                            
+                            fig.update_layout(
+                                title=f'{symbol} Stock Price',
+                                yaxis_title='Price ($)',
+                                xaxis_title='Date',
+                                hovermode='x unified'
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Display latest statistics
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                latest_close = hist['Close'].iloc[-1]
+                                first_close = hist['Close'].iloc[0]
+                                change = ((latest_close / first_close) - 1) * 100
+                                st.metric("Latest Close", f"${latest_close:.2f}", f"{change:.1f}%")
+                            with col2:
+                                st.metric("Day High", f"${hist['High'].iloc[-1]:.2f}")
+                            with col3:
+                                st.metric("Day Low", f"${hist['Low'].iloc[-1]:.2f}")
+                        except Exception as e:
+                            st.error(f"Error creating live chart: {str(e)}")
             
             else:
                 st.error("Not enough historical data available for analysis")
