@@ -1,93 +1,64 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <!-- Stock Search and Add Section -->
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Add Stock</h5>
-                <div class="input-group mb-3">
-                    <input type="text" id="stockSymbol" class="form-control" placeholder="Enter stock symbol (e.g., AAPL)">
-                    <button class="btn btn-primary" type="button" onclick="addStock()">
-                        <i class="bi bi-plus-lg"></i> Add
-                    </button>
-                </div>
-                <div id="stockError" class="alert alert-danger d-none"></div>
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-6 offset-md-3">
+            <div class="input-group">
+                <input type="text" id="stockSearch" class="form-control" placeholder="Search for a stock (e.g., AAPL, GOOGL)">
+                <button class="btn btn-primary" type="button" id="searchButton">Search</button>
             </div>
-        </div>
-
-        <!-- Technical Indicators -->
-        <div class="card mt-3">
-            <div class="card-body">
-                <h5 class="card-title">Technical Indicators</h5>
-                <div id="technicalIndicators">
-                    <!-- Indicators will be added here -->
-                </div>
-            </div>
+            <div id="searchResults" class="list-group mt-2"></div>
         </div>
     </div>
 
-    <!-- Main Chart Section -->
-    <div class="col-md-8 mb-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Stock Chart</h5>
-                <div id="stockChart" class="chart-container"></div>
-                <div class="btn-group mt-3">
-                    <button class="btn btn-outline-secondary" onclick="updateChart('1d')">1D</button>
-                    <button class="btn btn-outline-secondary" onclick="updateChart('1w')">1W</button>
-                    <button class="btn btn-outline-secondary" onclick="updateChart('1m')">1M</button>
-                    <button class="btn btn-outline-secondary" onclick="updateChart('3m')">3M</button>
-                    <button class="btn btn-outline-secondary" onclick="updateChart('1y')">1Y</button>
+    <div id="stockData" class="d-none">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h2 id="stockSymbol" class="card-title"></h2>
+                        <div class="row">
+                            <div class="col">
+                                <h3 id="currentPrice"></h3>
+                                <span id="priceChange"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Stock List Section -->
-<div class="row" id="stockList">
-    <!-- Stock cards will be dynamically added here -->
-</div>
-
-<!-- Prediction Section -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card prediction-card">
-            <div class="card-body">
-                <h5 class="card-title">Price Predictions</h5>
-                <div id="predictions" class="row">
-                    <!-- Prediction cards will be dynamically added here -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div id="stockChart"></div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Features Section -->
-<div class="row mt-4">
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-graph-up text-primary"></i> Real-Time Data</h5>
-                <p class="card-text">Get live stock prices, charts, and technical indicators updated in real-time.</p>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Technical Indicators</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">RSI: <span id="rsiValue"></span></li>
+                            <li class="list-group-item">MACD: <span id="macdValue"></span></li>
+                            <li class="list-group-item">Signal: <span id="signalValue"></span></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-robot text-primary"></i> AI Predictions</h5>
-                <p class="card-text">Advanced machine learning models predict future stock prices with confidence scores.</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-tools text-primary"></i> Technical Analysis</h5>
-                <p class="card-text">Access key technical indicators like RSI and MACD to make informed decisions.</p>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Price Prediction</h5>
+                        <div id="predictionChart"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

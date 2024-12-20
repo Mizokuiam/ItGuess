@@ -1,169 +1,183 @@
-// Stock data management and chart rendering
-let currentSymbol = null;
+// Global variables
+let currentSymbol = '';
 let stockChart = null;
+let predictionChart = null;
 
-async function addStock() {
-    const symbolInput = document.getElementById('stockSymbol');
-    const symbol = symbolInput.value.trim().toUpperCase();
-    const errorDiv = document.getElementById('stockError');
+// Initialize event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('stockSearch');
+    const searchButton = document.getElementById('searchButton');
+    const searchResults = document.getElementById('searchResults');
+
+    // Setup search functionality
+    searchInput.addEventListener('input', debounce(handleSearch, 300));
+    searchButton.addEventListener('click', () => handleSearch(searchInput.value));
     
-    if (!symbol) {
-        showError('Please enter a stock symbol');
-        return;
-    }
+    // Handle enter key in search
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleSearch(searchInput.value);
+        }
+    });
+});
+
+// Debounce function to limit API calls
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Handle stock search
+async function handleSearch(query) {
+    if (!query) return;
     
     try {
-        const response = await fetch('/api/add_stock', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ symbol })
-        });
-        
+        const response = await fetch(`/api/search_stock?query=${encodeURIComponent(query)}`);
         const data = await response.json();
         
-        if (data.success) {
-            symbolInput.value = '';
-            errorDiv.classList.add('d-none');
-            await loadStockData(symbol);
+        const searchResults = document.getElementById('searchResults');
+        searchResults.innerHTML = '';
+        
+        if (data.results && data.results.length > 0) {
+            data.results.forEach(stock => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<strong>${stock.symbol}</strong> - ${stock.name}`;
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadStock(stock.symbol);
+                    searchResults.innerHTML = '';
+                });
+                searchResults.appendChild(item);
+            });
         } else {
-            showError(data.message || 'Failed to add stock');
+            searchResults.innerHTML = '<div class="list-group-item">No results found</div>';
         }
     } catch (error) {
-        showError('Error adding stock: ' + error.message);
+        console.error('Search error:', error);
+        const searchResults = document.getElementById('searchResults');
+        searchResults.innerHTML = '<div class="list-group-item text-danger">Error searching for stocks</div>';
     }
 }
 
-async function loadStockData(symbol, period = '1m') {
+// Load stock data and update UI
+async function loadStock(symbol) {
     try {
-        const response = await fetch(`/api/stock/${symbol}?period=${period}`);
+        currentSymbol = symbol;
+        document.getElementById('stockData').classList.remove('d-none');
+        document.getElementById('stockSymbol').textContent = symbol;
+        
+        const response = await fetch(`/api/stock/${symbol}`);
         const data = await response.json();
         
-        if (data.success) {
-            currentSymbol = symbol;
-            updateChart(data);
-            updateIndicators(data.indicators);
-            updatePrediction(data.predicted);
-        } else {
-            showError(data.error || 'Failed to load stock data');
+        if (data.error) {
+            throw new Error(data.error);
         }
+        
+        updatePriceInfo(data.current);
+        updateChart(data.prices);
+        updateIndicators(data.indicators);
+        updatePrediction(data.predicted);
+        
     } catch (error) {
-        showError('Error loading stock data: ' + error.message);
+        console.error('Error loading stock:', error);
+        alert('Error loading stock data. Please try again.');
     }
 }
 
-function updateChart(data) {
-    const chartDiv = document.getElementById('stockChart');
+// Update price information
+function updatePriceInfo(current) {
+    const priceElement = document.getElementById('currentPrice');
+    const changeElement = document.getElementById('priceChange');
+    
+    priceElement.textContent = `$${current.price.toFixed(2)}`;
+    const changeText = current.change.toFixed(2);
+    const changeClass = current.change >= 0 ? 'text-success' : 'text-danger';
+    const changeSymbol = current.change >= 0 ? '▲' : '▼';
+    
+    changeElement.textContent = `${changeSymbol} ${Math.abs(changeText)}%`;
+    changeElement.className = changeClass;
+}
+
+// Update stock chart
+function updateChart(prices) {
+    const dates = prices.map(p => p.date);
+    const values = prices.map(p => p.price);
     
     const trace = {
-        x: data.prices.map(p => p.date),
-        y: data.prices.map(p => p.price),
+        x: dates,
+        y: values,
         type: 'scatter',
         mode: 'lines',
         name: currentSymbol,
         line: {
-            color: '#2196F3',
+            color: '#17a2b8',
             width: 2
         }
     };
     
     const layout = {
-        title: `${currentSymbol} Stock Price`,
+        title: 'Stock Price History',
         xaxis: {
             title: 'Date',
-            showgrid: false
+            rangeslider: { visible: true }
         },
         yaxis: {
-            title: 'Price ($)',
-            showgrid: true
+            title: 'Price ($)'
         },
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor: 'rgba(0,0,0,0)',
-        margin: { t: 30, b: 40, l: 60, r: 30 }
+        showlegend: true
     };
     
-    Plotly.newPlot(chartDiv, [trace], layout);
+    Plotly.newPlot('stockChart', [trace], layout);
 }
 
+// Update technical indicators
 function updateIndicators(indicators) {
-    const container = document.getElementById('technicalIndicators');
-    container.innerHTML = `
-        <div class="row">
-            <div class="col-4">
-                <div class="indicator-card">
-                    <h6>RSI</h6>
-                    <p class="mb-0 ${getRSIClass(indicators.RSI)}">${indicators.RSI}</p>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="indicator-card">
-                    <h6>MACD</h6>
-                    <p class="mb-0">${indicators.MACD}</p>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="indicator-card">
-                    <h6>Signal</h6>
-                    <p class="mb-0">${indicators.Signal}</p>
-                </div>
-            </div>
-        </div>
-    `;
+    document.getElementById('rsiValue').textContent = indicators.RSI;
+    document.getElementById('macdValue').textContent = indicators.MACD;
+    document.getElementById('signalValue').textContent = indicators.Signal;
 }
 
-function updatePrediction(prediction) {
-    const container = document.getElementById('predictions');
-    if (!container) return;
+// Update prediction chart
+function updatePrediction(predicted) {
+    if (!predicted || !predicted.dates || !predicted.values) return;
     
-    const priceChange = prediction.predicted_price - prediction.current_price;
-    const changePercent = (priceChange / prediction.current_price) * 100;
-    const changeClass = priceChange >= 0 ? 'text-success' : 'text-danger';
+    const trace = {
+        x: predicted.dates,
+        y: predicted.values,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Predicted',
+        line: {
+            color: '#28a745',
+            width: 2,
+            dash: 'dot'
+        }
+    };
     
-    container.innerHTML = `
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">Current Price</h6>
-                    <p class="h4">$${prediction.current_price.toFixed(2)}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">Predicted Price</h6>
-                    <p class="h4">$${prediction.predicted_price.toFixed(2)}</p>
-                    <p class="mb-0 ${changeClass}">
-                        ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">Confidence</h6>
-                    <p class="h4">${(prediction.confidence * 100).toFixed(1)}%</p>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function getRSIClass(rsi) {
-    if (rsi > 70) return 'text-danger';
-    if (rsi < 30) return 'text-success';
-    return 'text-warning';
-}
-
-function showError(message) {
-    const errorDiv = document.getElementById('stockError');
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('d-none');
+    const layout = {
+        title: 'Price Prediction',
+        xaxis: {
+            title: 'Date'
+        },
+        yaxis: {
+            title: 'Price ($)'
+        },
+        showlegend: true
+    };
+    
+    Plotly.newPlot('predictionChart', [trace], layout);
 }
 
 // Initialize with a default stock
 document.addEventListener('DOMContentLoaded', () => {
-    loadStockData('AAPL');
+    loadStock('AAPL');
 });

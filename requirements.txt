@@ -1,8 +1,4 @@
 flask==2.0.1
-flask-login==0.5.0
-flask-sqlalchemy==2.5.1
-flask-migrate==3.1.0
-flask-wtf==1.0.1
 yfinance==0.2.36
 pandas==1.5.3
 numpy==1.24.3
@@ -11,16 +7,6 @@ tensorflow==2.13.0
 plotly==5.18.0
 python-dotenv==1.0.0
 requests==2.31.0
-email-validator==2.1.0.post1
-bcrypt==4.1.1
-pandas-ta==0.3.14b0
-reportlab==4.0.8
 gunicorn==21.2.0
 Werkzeug==2.0.1
 Jinja2==3.0.3
-SQLAlchemy==1.4.46
-WTForms==3.0.1
-click==8.0.4
-itsdangerous==2.0.1
-markupsafe==2.0.1
-psycopg2-binary==2.9.9
