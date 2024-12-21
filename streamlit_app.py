@@ -222,38 +222,34 @@ if symbol:
                         technical_analysis.symbol = symbol
                         technical_analysis.data = hist.copy()  # Create a copy of the data
                         
-                        # Calculate indicators with the current periods
-                        rsi = technical_analysis.calculate_rsi(hist['Close'].values, rsi_period)
-                        if rsi is not None:
-                            indicators = technical_analysis.calculate_indicators(hist)
+                        # Calculate indicators
+                        indicators = technical_analysis.calculate_indicators()
+                        
+                        if indicators and any(v != 'N/A' for v in indicators.values()):
+                            # Display indicators in columns
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                rsi_val = indicators.get('RSI', 'N/A')
+                                st.metric("RSI", f"{rsi_val}")
+                                
+                                macd = indicators.get('MACD', 'N/A')
+                                st.metric("MACD", f"{macd}")
                             
-                            if indicators and any(v != 'N/A' for v in indicators.values()):
-                                # Display indicators in columns
-                                col1, col2, col3 = st.columns(3)
-                                with col1:
-                                    rsi_val = indicators.get('RSI', 'N/A')
-                                    st.metric("RSI", f"{rsi_val}")
-                                    
-                                    macd = indicators.get('MACD', 'N/A')
-                                    st.metric("MACD", f"{macd}")
+                            with col2:
+                                ema20 = indicators.get('EMA20', 'N/A')
+                                st.metric("EMA 20", f"{ema20}")
                                 
-                                with col2:
-                                    ema20 = indicators.get('EMA20', 'N/A')
-                                    st.metric("EMA 20", f"{ema20}")
-                                    
-                                    signal = indicators.get('Signal', 'N/A')
-                                    st.metric("Signal", f"{signal}")
+                                signal = indicators.get('Signal', 'N/A')
+                                st.metric("Signal", f"{signal}")
+                            
+                            with col3:
+                                ema50 = indicators.get('EMA50', 'N/A')
+                                st.metric("EMA 50", f"{ema50}")
                                 
-                                with col3:
-                                    ema50 = indicators.get('EMA50', 'N/A')
-                                    st.metric("EMA 50", f"{ema50}")
-                                    
-                                    volume = indicators.get('Volume', 'N/A')
-                                    st.metric("Volume", f"{volume:,}" if isinstance(volume, (int, float)) else 'N/A')
-                            else:
-                                st.error("Unable to calculate indicators with current settings")
+                                volume = indicators.get('Volume', 'N/A')
+                                st.metric("Volume", f"{volume:,}" if isinstance(volume, (int, float)) else 'N/A')
                         else:
-                            st.error("Not enough data to calculate indicators")
+                            st.error("Unable to calculate indicators with current settings")
                     except Exception as e:
                         st.error(f"Error in technical analysis: {str(e)}")
                 
@@ -303,7 +299,7 @@ if symbol:
                     try:
                         # Calculate technical indicators
                         technical_analysis.data = hist.copy()
-                        rsi_data = technical_analysis.calculate_rsi(hist['Close'].values, rsi_period)  
+                        rsi_data = technical_analysis.calculate_rsi(prices=hist['Close'].values)  # Use named parameters
                         ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
                         ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
                         bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'], period=20)

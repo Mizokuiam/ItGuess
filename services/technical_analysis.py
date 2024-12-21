@@ -21,12 +21,9 @@ class TechnicalAnalysisService:
             return data
         return pd.DataFrame()
 
-    def calculate_indicators(self, data=None):
+    def calculate_indicators(self):
         """Calculate main technical indicators and return them as a dictionary"""
         try:
-            if data is not None:
-                self.data = data
-            
             if self.data is None or self.data.empty:
                 return None
 
