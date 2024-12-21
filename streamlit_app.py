@@ -299,10 +299,10 @@ if symbol:
                     try:
                         # Calculate technical indicators
                         technical_analysis.data = hist.copy()
-                        rsi_data = technical_analysis.calculate_rsi(prices=hist['Close'].values)  # Use named parameters
-                        ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
-                        ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
-                        bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'], period=20)
+                        rsi_data = technical_analysis.calculate_rsi(data=hist['Close'].values, window=rsi_period)
+                        ema_short = technical_analysis.calculate_ema(data=hist['Close'], window=ma_period)
+                        ema_long = technical_analysis.calculate_ema(data=hist['Close'], window=50)
+                        bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(data=hist['Close'], window=20)
                         
                         if rsi_data is not None:
                             # Create figure with secondary y-axis

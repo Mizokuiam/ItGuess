@@ -34,18 +34,18 @@ class TechnicalAnalysisService:
             # Create a copy of the data to avoid modifying the original
             df = self.data.copy()
 
-            # Calculate RSI
+            # Calculate RSI with current rsi_period from streamlit
             rsi = self.calculate_rsi(df['Close'].values)
             
             # Calculate MACD
             macd, signal = self.calculate_macd(df['Close'])
             
             # Calculate EMAs
-            ema_20 = self.calculate_ema(df['Close'], period=20)
-            ema_50 = self.calculate_ema(df['Close'], period=50)
+            ema_20 = self.calculate_ema(df['Close'], window=20)
+            ema_50 = self.calculate_ema(df['Close'], window=50)
             
             # Calculate Bollinger Bands
-            bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(df['Close'])
+            bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(df['Close'], window=20)
 
             # Get the latest values and handle NaN values
             result = {}
@@ -87,22 +87,28 @@ class TechnicalAnalysisService:
             print(f"Error calculating indicators: {str(e)}")
             return None
 
-    def calculate_rsi(self, prices, period=14):
-        """Calculate RSI for given prices"""
+    def calculate_rsi(self, data, window=14):
+        """Calculate RSI for given price data
+        
+        Args:
+            data: numpy array or pandas Series of prices
+            window: RSI period/window (default: 14)
+        """
         try:
-            # Validate period
-            if not isinstance(period, (int, float)) or period <= 0:
-                raise ValueError("RSI period must be a positive number")
-            period = int(period)  # Convert to integer
+            # Validate window
+            if not isinstance(window, (int, float)) or window <= 0:
+                raise ValueError("RSI window must be a positive number")
+            window = int(window)  # Convert to integer
             
-            if not isinstance(prices, np.ndarray):
-                prices = np.array(prices)
+            # Convert to numpy array if needed
+            if not isinstance(data, np.ndarray):
+                data = np.array(data)
             
-            if len(prices) < period + 1:
+            if len(data) < window + 1:
                 return None
             
             # Calculate price changes
-            deltas = np.diff(prices)
+            deltas = np.diff(data)
             
             # Separate gains and losses
             gains = np.where(deltas > 0, deltas, 0)
@@ -113,23 +119,23 @@ class TechnicalAnalysisService:
             avg_losses = np.zeros_like(deltas)
             
             # First average
-            avg_gains[period-1] = np.mean(gains[:period])
-            avg_losses[period-1] = np.mean(losses[:period])
+            avg_gains[window-1] = np.mean(gains[:window])
+            avg_losses[window-1] = np.mean(losses[:window])
             
             # Calculate subsequent values
-            for i in range(period, len(deltas)):
-                avg_gains[i] = (avg_gains[i-1] * (period-1) + gains[i]) / period
-                avg_losses[i] = (avg_losses[i-1] * (period-1) + losses[i]) / period
+            for i in range(window, len(deltas)):
+                avg_gains[i] = (avg_gains[i-1] * (window-1) + gains[i]) / window
+                avg_losses[i] = (avg_losses[i-1] * (window-1) + losses[i]) / window
             
             # Calculate RS and RSI
             rs = avg_gains / np.where(avg_losses == 0, 1e-9, avg_losses)  # Avoid division by zero
             rsi = 100 - (100 / (1 + rs))
             
             # Pad the beginning with None
-            full_rsi = np.full(len(prices), np.nan)
-            full_rsi[period:] = rsi[period-1:]
+            full_rsi = np.full(len(data), np.nan)
+            full_rsi[window:] = rsi[window-1:]
             
-            return pd.Series(full_rsi, index=pd.Series(prices).index)
+            return pd.Series(full_rsi, index=pd.Series(data).index)
             
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")
@@ -157,39 +163,29 @@ class TechnicalAnalysisService:
             print(f"Error calculating MACD: {str(e)}")
             return None, None
 
-    def calculate_ema(self, prices, period=20):
-        """Calculate EMA for given prices"""
-        if period <= 0:
-            raise ValueError("EMA period must be greater than 0")
+    def calculate_ema(self, data, window=20):
+        """Calculate EMA for given data"""
         try:
-            if len(prices) < period:
-                return None
-            
-            ema = prices.ewm(span=period, min_periods=1, adjust=False).mean()
-            return ema
-            
+            if not isinstance(window, (int, float)) or window <= 0:
+                raise ValueError("EMA window must be a positive number")
+            window = int(window)
+            return pd.Series(data).ewm(span=window, adjust=False).mean()
         except Exception as e:
             print(f"Error calculating EMA: {str(e)}")
             return None
 
-    def calculate_bollinger_bands(self, prices, period=20, num_std=2):
-        """Calculate Bollinger Bands"""
-        if period <= 0:
-            raise ValueError("Bollinger Bands period must be greater than 0")
+    def calculate_bollinger_bands(self, data, window=20, num_std=2):
+        """Calculate Bollinger Bands for given data"""
         try:
-            if len(prices) < period:
-                return None, None, None
+            if not isinstance(window, (int, float)) or window <= 0:
+                raise ValueError("Bollinger Bands window must be a positive number")
+            window = int(window)
             
-            # Calculate rolling mean and standard deviation
-            rolling_mean = prices.rolling(window=period, min_periods=1).mean()
-            rolling_std = prices.rolling(window=period, min_periods=1).std()
-            
-            # Calculate bands
-            upper_band = rolling_mean + (rolling_std * num_std)
-            lower_band = rolling_mean - (rolling_std * num_std)
-            
-            return upper_band, rolling_mean, lower_band
-            
+            sma = pd.Series(data).rolling(window=window).mean()
+            std = pd.Series(data).rolling(window=window).std()
+            upper_band = sma + (std * num_std)
+            lower_band = sma - (std * num_std)
+            return upper_band, sma, lower_band
         except Exception as e:
             print(f"Error calculating Bollinger Bands: {str(e)}")
             return None, None, None
