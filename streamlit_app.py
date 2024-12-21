@@ -11,9 +11,107 @@ from plotly.subplots import make_subplots
 # Page config
 st.set_page_config(
     page_title="ItGuess - Stock Price Predictor",
-    page_icon="📈",
+    page_icon="🎯",
     layout="wide"
 )
+
+# Custom CSS for modern minimalist design
+st.markdown("""
+    <style>
+        /* Modern color scheme */
+        :root {
+            --primary-color: #1E88E5;
+            --background-color: #FFFFFF;
+            --text-color: #333333;
+            --accent-color: #E3F2FD;
+        }
+        
+        /* Main title styling */
+        .main-title {
+            color: var(--text-color);
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 700;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #1E88E5, #64B5F6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 2px 2px 4px rgba(30, 136, 229, 0.1);
+        }
+        
+        .main-title span.highlight {
+            color: var(--primary-color);
+            font-weight: 800;
+        }
+        
+        /* Logo styling */
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border-radius: 16px;
+        }
+        
+        .logo {
+            background: linear-gradient(135deg, var(--primary-color), #64B5F6);
+            color: white;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(30, 136, 229, 0.2);
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            font-weight: 400;
+            margin-bottom: 2rem;
+            letter-spacing: 0.2px;
+        }
+        
+        /* Sidebar styling */
+        .sidebar-logo {
+            background: linear-gradient(135deg, var(--primary-color), #64B5F6);
+            color: white;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(30, 136, 229, 0.15);
+        }
+        
+        .sidebar-title {
+            background: linear-gradient(135deg, #1E88E5, #64B5F6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Title with modern logo
+st.markdown("""
+    <div class="logo-container">
+        <div class="logo">IG</div>
+        <h1 class="main-title">It<span class="highlight">Guess</span></h1>
+    </div>
+    <p class="subtitle">Predict stock prices using machine learning and technical analysis</p>
+    """, unsafe_allow_html=True)
 
 # Initialize services
 @st.cache_resource
@@ -22,23 +120,20 @@ def get_services():
 
 technical_analysis, prediction_service = get_services()
 
-# Title
-st.markdown("""
-    <div style='display: flex; align-items: center; gap: 10px;'>
-        <h1>📈 ItGuess - Stock Price Predictor</h1>
-    </div>
-    <p>Predict stock prices using machine learning and technical analysis</p>
-    """, unsafe_allow_html=True)
-
 # Initialize session state
 if 'last_symbol' not in st.session_state:
     st.session_state.last_symbol = ''
 if 'last_update' not in st.session_state:
     st.session_state.last_update = datetime.now()
 
-# Sidebar
+# Sidebar with matching design
 with st.sidebar:
-    st.markdown("### 📈 ItGuess")
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="sidebar-logo">IG</div>
+            <h3 class="sidebar-title">ItGuess</h3>
+        </div>
+    """, unsafe_allow_html=True)
     st.header("Settings")
     symbol = st.text_input("Enter Stock Symbol (e.g., AAPL)", value="AAPL").upper()
     period = st.selectbox(
@@ -303,10 +398,10 @@ if symbol:
                     
                     # Calculate technical indicators
                     technical_analysis.data = hist.copy()
-                    rsi = technical_analysis.calculate_rsi(period=rsi_period)
+                    rsi = technical_analysis.calculate_rsi(hist['Close'], period=rsi_period)
                     ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
                     ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
-                    bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'])
+                    bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'], period=20)
                     
                     # Create figure with secondary y-axis
                     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 

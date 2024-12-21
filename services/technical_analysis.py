@@ -92,12 +92,12 @@ class TechnicalAnalysisService:
             print(f"Error calculating indicators: {str(e)}")
             return None
 
-    def calculate_rsi(self, prices, window=14):
+    def calculate_rsi(self, prices, period=14):
         """Calculate RSI for given prices"""
-        if window <= 0:
-            raise ValueError("RSI window must be greater than 0")
+        if period <= 0:
+            raise ValueError("RSI period must be greater than 0")
         try:
-            if len(prices) < window + 1:
+            if len(prices) < period + 1:
                 return None
             
             # Calculate price changes
@@ -110,8 +110,8 @@ class TechnicalAnalysisService:
             losses['change'] = -delta.where(delta < 0, 0)
             
             # Calculate rolling averages
-            gains_avg = gains['change'].rolling(window=window, min_periods=1).mean()
-            losses_avg = losses['change'].rolling(window=window, min_periods=1).mean()
+            gains_avg = gains['change'].rolling(window=period, min_periods=1).mean()
+            losses_avg = losses['change'].rolling(window=period, min_periods=1).mean()
             
             # Calculate RS and RSI
             rs = gains_avg / losses_avg
@@ -162,6 +162,8 @@ class TechnicalAnalysisService:
 
     def calculate_bollinger_bands(self, prices, period=20, num_std=2):
         """Calculate Bollinger Bands"""
+        if period <= 0:
+            raise ValueError("Bollinger Bands period must be greater than 0")
         try:
             if len(prices) < period:
                 return None, None, None
@@ -231,15 +233,15 @@ class TechnicalAnalysisService:
             self.data['MACD'] = float('nan')
             self.data['Signal_Line'] = float('nan')
         
-    def calculate_bollinger_bands(self, period=20, std_dev=2):
+    def calculate_bollinger_bands(self, period=20, num_std=2):
         """Calculate Bollinger Bands"""
         if period <= 0:
             raise ValueError("Bollinger Bands period must be greater than 0")
         try:
             self.data['BB_Middle'] = self.data['Close'].rolling(window=period, min_periods=1).mean()
             rolling_std = self.data['Close'].rolling(window=period, min_periods=1).std()
-            self.data['BB_Upper'] = self.data['BB_Middle'] + (rolling_std * std_dev)
-            self.data['BB_Lower'] = self.data['BB_Middle'] - (rolling_std * std_dev)
+            self.data['BB_Upper'] = self.data['BB_Middle'] + (rolling_std * num_std)
+            self.data['BB_Lower'] = self.data['BB_Middle'] - (rolling_std * num_std)
         except Exception as e:
             print(f"Error calculating Bollinger Bands: {str(e)}")
             self.data['BB_Middle'] = float('nan')
