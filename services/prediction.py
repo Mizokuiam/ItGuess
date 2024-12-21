@@ -52,61 +52,42 @@ class PredictionService:
         """Train all prediction models"""
         try:
             # Get historical data
-            stock = yf.Ticker(symbol)
-            hist = stock.history(period='1y')
-            
-            if hist.empty:
-                raise ValueError(f"No historical data available for {symbol}")
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=365)
+            data = yf.download(symbol, start=start_date, end=end_date)['Close'].values
             
             # Store data
-            self.data = hist
+            self.data = data
             
             # Prepare data
-            data = hist['Close'].values
             x_train, y_train = self.prepare_data(data)
-            
             if x_train is None or y_train is None:
-                raise ValueError("Not enough data for training")
-            
+                return False
+                
             # Reshape data for LSTM
-            x_train_lstm = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
+            x_train_lstm = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
             
             # Train LSTM
-            self.lstm_model.fit(x_train_lstm, y_train, epochs=50, batch_size=32, verbose=0)
+            self.lstm_model.fit(x_train_lstm, y_train, epochs=10, batch_size=32, verbose=0)
+            lstm_pred = self.lstm_model.predict(x_train_lstm)
+            self.metrics['lstm_accuracy'] = r2_score(y_train, lstm_pred)
             
             # Train Random Forest
-            self.rf_model.fit(x_train, y_train)
+            x_train_rf = x_train.reshape(x_train.shape[0], -1)
+            self.rf_model.fit(x_train_rf, y_train)
+            rf_pred = self.rf_model.predict(x_train_rf)
+            self.metrics['rf_accuracy'] = r2_score(y_train, rf_pred)
             
             # Train Linear Regression
-            self.lr_model.fit(x_train, y_train)
-            
-            # Calculate metrics
-            self.metrics = {
-                'LSTM': self._calculate_model_accuracy(self.lstm_model, x_train_lstm, y_train),
-                'Random Forest': self._calculate_model_accuracy(self.rf_model, x_train, y_train),
-                'Linear Regression': self._calculate_model_accuracy(self.lr_model, x_train, y_train)
-            }
+            self.lr_model.fit(x_train_rf, y_train)
+            lr_pred = self.lr_model.predict(x_train_rf)
+            self.metrics['lr_accuracy'] = r2_score(y_train, lr_pred)
             
             return True
         except Exception as e:
             print(f"Error training models: {str(e)}")
             return False
             
-    def _calculate_model_accuracy(self, model, X, y):
-        """Calculate model accuracy"""
-        try:
-            if isinstance(model, Sequential):  # LSTM model
-                y_pred = model.predict(X, verbose=0)
-            else:
-                y_pred = model.predict(X)
-            
-            # Calculate R² score
-            r2 = r2_score(y, y_pred)
-            return max(0, min(1, r2))  # Ensure score is between 0 and 1
-        except Exception as e:
-            print(f"Error calculating model accuracy: {str(e)}")
-            return 0.0
-    
     def get_prediction(self, symbol, period='1d'):
         """Get price predictions from all models"""
         try:
@@ -181,9 +162,9 @@ class PredictionService:
             
         # Use R² scores to calculate confidence
         r2_scores = [
-            self.metrics['LSTM'],
-            self.metrics['Random Forest'],
-            self.metrics['Linear Regression']
+            self.metrics['lstm_accuracy'],
+            self.metrics['rf_accuracy'],
+            self.metrics['lr_accuracy']
         ]
         avg_r2 = np.mean(r2_scores)
         confidence = min(95, max(60, avg_r2 * 100))  # Scale between 60-95%
@@ -240,7 +221,7 @@ class PredictionService:
         predictions = {}
         try:
             # Prepare latest data for prediction
-            latest_data = self.data['Close'].values[-60:]  # Get last 60 days
+            latest_data = self.data[-60:]  # Get last 60 days
             latest_data = self.scaler.transform(latest_data.reshape(-1, 1))
             latest_data = latest_data.reshape(1, 60, 1)  # Reshape for LSTM
             

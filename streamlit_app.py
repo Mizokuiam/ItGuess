@@ -22,8 +22,12 @@ def get_services():
 technical_analysis, prediction_service = get_services()
 
 # Title
-st.title("ItGuess - Stock Price Predictor")
-st.markdown("Predict stock prices using machine learning and technical analysis")
+st.markdown("""
+    <div style='display: flex; align-items: center; gap: 10px;'>
+        <h1>📈 ItGuess - Stock Price Predictor</h1>
+    </div>
+    <p>Predict stock prices using machine learning and technical analysis</p>
+    """, unsafe_allow_html=True)
 
 # Initialize session state
 if 'last_symbol' not in st.session_state:
@@ -33,6 +37,7 @@ if 'last_update' not in st.session_state:
 
 # Sidebar
 with st.sidebar:
+    st.markdown("### 📈 ItGuess")
     st.header("Settings")
     symbol = st.text_input("Enter Stock Symbol (e.g., AAPL)", value="AAPL").upper()
     period = st.selectbox(

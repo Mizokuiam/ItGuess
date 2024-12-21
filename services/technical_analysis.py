@@ -92,10 +92,12 @@ class TechnicalAnalysisService:
             print(f"Error calculating indicators: {str(e)}")
             return None
 
-    def calculate_rsi(self, prices, periods=14):
-        """Calculate Relative Strength Index"""
+    def calculate_rsi(self, prices, window=14):
+        """Calculate RSI for given prices"""
+        if window <= 0:
+            raise ValueError("RSI window must be greater than 0")
         try:
-            if len(prices) < periods + 1:
+            if len(prices) < window + 1:
                 return None
             
             # Calculate price changes
@@ -108,8 +110,8 @@ class TechnicalAnalysisService:
             losses['change'] = -delta.where(delta < 0, 0)
             
             # Calculate rolling averages
-            gains_avg = gains['change'].rolling(window=periods, min_periods=1).mean()
-            losses_avg = losses['change'].rolling(window=periods, min_periods=1).mean()
+            gains_avg = gains['change'].rolling(window=window, min_periods=1).mean()
+            losses_avg = losses['change'].rolling(window=window, min_periods=1).mean()
             
             # Calculate RS and RSI
             rs = gains_avg / losses_avg
@@ -143,13 +145,15 @@ class TechnicalAnalysisService:
             print(f"Error calculating MACD: {str(e)}")
             return None, None
 
-    def calculate_ema(self, prices, period):
-        """Calculate Exponential Moving Average"""
+    def calculate_ema(self, prices, window=20):
+        """Calculate EMA for given prices"""
+        if window <= 0:
+            raise ValueError("EMA window must be greater than 0")
         try:
-            if len(prices) < period:
+            if len(prices) < window:
                 return None
             
-            ema = prices.ewm(span=period, min_periods=1, adjust=False).mean()
+            ema = prices.ewm(span=window, min_periods=1, adjust=False).mean()
             return ema
             
         except Exception as e:
@@ -203,6 +207,8 @@ class TechnicalAnalysisService:
         
     def calculate_rsi(self, period=14):
         """Calculate Relative Strength Index"""
+        if period <= 0:
+            raise ValueError("RSI period must be greater than 0")
         try:
             delta = self.data['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
@@ -227,6 +233,8 @@ class TechnicalAnalysisService:
         
     def calculate_bollinger_bands(self, period=20, std_dev=2):
         """Calculate Bollinger Bands"""
+        if period <= 0:
+            raise ValueError("Bollinger Bands period must be greater than 0")
         try:
             self.data['BB_Middle'] = self.data['Close'].rolling(window=period, min_periods=1).mean()
             rolling_std = self.data['Close'].rolling(window=period, min_periods=1).std()
@@ -252,6 +260,8 @@ class TechnicalAnalysisService:
         
     def calculate_support_resistance(self, window=20):
         """Calculate Support and Resistance levels"""
+        if window <= 0:
+            raise ValueError("Support and Resistance window must be greater than 0")
         try:
             self.data['Support'] = self.data['Low'].rolling(window=window, min_periods=1).min()
             self.data['Resistance'] = self.data['High'].rolling(window=window, min_periods=1).max()
