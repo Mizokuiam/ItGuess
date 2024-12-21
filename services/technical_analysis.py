@@ -145,15 +145,15 @@ class TechnicalAnalysisService:
             print(f"Error calculating MACD: {str(e)}")
             return None, None
 
-    def calculate_ema(self, prices, window=20):
+    def calculate_ema(self, prices, period=20):
         """Calculate EMA for given prices"""
-        if window <= 0:
-            raise ValueError("EMA window must be greater than 0")
+        if period <= 0:
+            raise ValueError("EMA period must be greater than 0")
         try:
-            if len(prices) < window:
+            if len(prices) < period:
                 return None
             
-            ema = prices.ewm(span=window, min_periods=1, adjust=False).mean()
+            ema = prices.ewm(span=period, min_periods=1, adjust=False).mean()
             return ema
             
         except Exception as e:

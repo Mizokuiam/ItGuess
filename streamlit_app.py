@@ -304,8 +304,8 @@ if symbol:
                     # Calculate technical indicators
                     technical_analysis.data = hist.copy()
                     rsi = technical_analysis.calculate_rsi(period=rsi_period)
-                    ema_short = technical_analysis.calculate_ema(hist['Close'], window=ma_period)
-                    ema_long = technical_analysis.calculate_ema(hist['Close'], window=50)
+                    ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
+                    ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
                     bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'])
                     
                     # Create figure with secondary y-axis
