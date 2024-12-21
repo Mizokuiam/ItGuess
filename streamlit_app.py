@@ -225,7 +225,7 @@ if symbol:
                             technical_analysis.data = hist.copy()  # Create a copy of the data
                             
                             # Calculate indicators
-                            indicators = technical_analysis.calculate_indicators()
+                            indicators = technical_analysis.calculate_indicators(hist)
                             
                             if indicators and any(v != 'N/A' for v in indicators.values()):
                                 # Display indicators in columns
@@ -396,79 +396,88 @@ if symbol:
                     # Live Chart with Technical Analysis
                     st.header("Live Chart")
                     
-                    # Calculate technical indicators
-                    technical_analysis.data = hist.copy()
-                    rsi = technical_analysis.calculate_rsi(hist['Close'], period=rsi_period)
-                    ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
-                    ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
-                    bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'], period=20)
-                    
-                    # Create figure with secondary y-axis
-                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                                      vertical_spacing=0.03, 
-                                      row_heights=[0.7, 0.3])
+                    try:
+                        # Calculate technical indicators
+                        technical_analysis.data = hist.copy()
+                        rsi_data = technical_analysis.calculate_rsi(hist['Close'].values, period=rsi_period)
+                        ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
+                        ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
+                        bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'], period=20)
+                        
+                        if rsi_data is not None:
+                            # Create figure with secondary y-axis
+                            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                                          vertical_spacing=0.03, 
+                                          row_heights=[0.7, 0.3])
 
-                    # Add candlestick
-                    fig.add_trace(go.Candlestick(x=hist.index,
-                                               open=hist['Open'],
-                                               high=hist['High'],
-                                               low=hist['Low'],
-                                               close=hist['Close'],
-                                               name='OHLC'),
-                                row=1, col=1)
+                            # Add candlestick
+                            fig.add_trace(go.Candlestick(x=hist.index,
+                                                   open=hist['Open'],
+                                                   high=hist['High'],
+                                                   low=hist['Low'],
+                                                   close=hist['Close'],
+                                                   name='OHLC'),
+                                    row=1, col=1)
 
-                    # Add EMAs
-                    fig.add_trace(go.Scatter(x=hist.index, y=ema_short,
-                                           line=dict(color='orange', width=1),
-                                           name=f'EMA {ma_period}'),
-                                row=1, col=1)
-                    
-                    fig.add_trace(go.Scatter(x=hist.index, y=ema_long,
-                                           line=dict(color='blue', width=1),
-                                           name='EMA 50'),
-                                row=1, col=1)
+                            # Add EMAs
+                            if ema_short is not None:
+                                fig.add_trace(go.Scatter(x=hist.index, y=ema_short,
+                                               line=dict(color='orange', width=1),
+                                               name=f'EMA {ma_period}'),
+                                    row=1, col=1)
+                            
+                            if ema_long is not None:
+                                fig.add_trace(go.Scatter(x=hist.index, y=ema_long,
+                                               line=dict(color='blue', width=1),
+                                               name='EMA 50'),
+                                    row=1, col=1)
 
-                    # Add Bollinger Bands
-                    fig.add_trace(go.Scatter(x=hist.index, y=bb_upper,
-                                           line=dict(color='gray', width=1, dash='dash'),
-                                           name='BB Upper'),
-                                row=1, col=1)
-                    
-                    fig.add_trace(go.Scatter(x=hist.index, y=bb_lower,
-                                           line=dict(color='gray', width=1, dash='dash'),
-                                           name='BB Lower',
-                                           fill='tonexty'),
-                                row=1, col=1)
+                            # Add Bollinger Bands
+                            if all(x is not None for x in [bb_upper, bb_lower]):
+                                fig.add_trace(go.Scatter(x=hist.index, y=bb_upper,
+                                               line=dict(color='gray', width=1, dash='dash'),
+                                               name='BB Upper'),
+                                    row=1, col=1)
+                                
+                                fig.add_trace(go.Scatter(x=hist.index, y=bb_lower,
+                                               line=dict(color='gray', width=1, dash='dash'),
+                                               name='BB Lower',
+                                               fill='tonexty'),
+                                    row=1, col=1)
 
-                    # Add RSI
-                    fig.add_trace(go.Scatter(x=hist.index, y=rsi,
-                                           line=dict(color='purple', width=1),
-                                           name='RSI'),
-                                row=2, col=1)
+                            # Add RSI
+                            fig.add_trace(go.Scatter(x=hist.index, y=rsi_data,
+                                               line=dict(color='purple', width=1),
+                                               name='RSI'),
+                                    row=2, col=1)
 
-                    # Add RSI levels
-                    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-                    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+                            # Add RSI levels
+                            fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+                            fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
 
-                    # Update layout
-                    fig.update_layout(
-                        xaxis_rangeslider_visible=False,
-                        height=800,
-                        title_text=f"{symbol} Technical Analysis",
-                        showlegend=True,
-                        legend=dict(
-                            yanchor="top",
-                            y=0.99,
-                            xanchor="left",
-                            x=0.01
-                        )
-                    )
+                            # Update layout
+                            fig.update_layout(
+                                xaxis_rangeslider_visible=False,
+                                height=800,
+                                title_text=f"{symbol} Technical Analysis",
+                                showlegend=True,
+                                legend=dict(
+                                    yanchor="top",
+                                    y=0.99,
+                                    xanchor="left",
+                                    x=0.01
+                                )
+                            )
 
-                    # Update y-axes labels
-                    fig.update_yaxes(title_text="Price", row=1, col=1)
-                    fig.update_yaxes(title_text="RSI", row=2, col=1)
+                            # Update y-axes labels
+                            fig.update_yaxes(title_text="Price", row=1, col=1)
+                            fig.update_yaxes(title_text="RSI", row=2, col=1)
 
-                    st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.error("Not enough data to calculate technical indicators")
+                    except Exception as e:
+                        st.error(f"Error creating live chart: {str(e)}")
             
             else:
                 st.error("Not enough historical data available for analysis")

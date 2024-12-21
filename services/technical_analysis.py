@@ -38,20 +38,17 @@ class TechnicalAnalysisService:
             df = self.data.copy()
 
             # Calculate RSI
-            rsi = self.calculate_rsi(df['Close'])
+            rsi = self.calculate_rsi(df['Close'].values)
             
             # Calculate MACD
             macd, signal = self.calculate_macd(df['Close'])
             
             # Calculate EMAs
-            ema_20 = self.calculate_ema(df['Close'], 20)
-            ema_50 = self.calculate_ema(df['Close'], 50)
+            ema_20 = self.calculate_ema(df['Close'], period=20)
+            ema_50 = self.calculate_ema(df['Close'], period=50)
             
             # Calculate Bollinger Bands
             bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(df['Close'])
-            
-            # Calculate Volume SMA
-            volume_sma = df['Volume'].rolling(window=20, min_periods=1).mean()
 
             # Get the latest values and handle NaN values
             result = {}
@@ -63,6 +60,8 @@ class TechnicalAnalysisService:
                 if isinstance(series, pd.Series) and not series.empty:
                     latest = series.iloc[-1]
                     return None if pd.isna(latest) else latest
+                if isinstance(series, np.ndarray):
+                    return series[-1] if len(series) > 0 else None
                 return None
 
             # Add indicators to result dict
@@ -75,7 +74,6 @@ class TechnicalAnalysisService:
             result['BB_Middle'] = get_latest_value(bb_middle)
             result['BB_Lower'] = get_latest_value(bb_lower)
             result['Volume'] = get_latest_value(df['Volume'])
-            result['Volume_SMA'] = get_latest_value(volume_sma)
 
             # Round numeric values
             for key in result:
@@ -94,30 +92,42 @@ class TechnicalAnalysisService:
 
     def calculate_rsi(self, prices, period=14):
         """Calculate RSI for given prices"""
-        if period <= 0:
-            raise ValueError("RSI period must be greater than 0")
         try:
+            if not isinstance(prices, np.ndarray):
+                prices = np.array(prices)
+            
             if len(prices) < period + 1:
                 return None
             
             # Calculate price changes
-            delta = prices.diff()
+            deltas = np.diff(prices)
             
-            # Create separate DataFrames for gains and losses
-            gains = pd.DataFrame(index=delta.index)
-            losses = pd.DataFrame(index=delta.index)
-            gains['change'] = delta.where(delta > 0, 0)
-            losses['change'] = -delta.where(delta < 0, 0)
+            # Separate gains and losses
+            gains = np.where(deltas > 0, deltas, 0)
+            losses = np.where(deltas < 0, -deltas, 0)
             
-            # Calculate rolling averages
-            gains_avg = gains['change'].rolling(window=period, min_periods=1).mean()
-            losses_avg = losses['change'].rolling(window=period, min_periods=1).mean()
+            # Calculate average gains and losses
+            avg_gains = np.zeros_like(deltas)
+            avg_losses = np.zeros_like(deltas)
+            
+            # First average
+            avg_gains[period-1] = np.mean(gains[:period])
+            avg_losses[period-1] = np.mean(losses[:period])
+            
+            # Calculate subsequent values
+            for i in range(period, len(deltas)):
+                avg_gains[i] = (avg_gains[i-1] * (period-1) + gains[i]) / period
+                avg_losses[i] = (avg_losses[i-1] * (period-1) + losses[i]) / period
             
             # Calculate RS and RSI
-            rs = gains_avg / losses_avg
+            rs = avg_gains / np.where(avg_losses == 0, 1e-9, avg_losses)  # Avoid division by zero
             rsi = 100 - (100 / (1 + rs))
             
-            return rsi
+            # Pad the beginning with None
+            full_rsi = np.full(len(prices), np.nan)
+            full_rsi[period:] = rsi[period-1:]
+            
+            return full_rsi
             
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")
