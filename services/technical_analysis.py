@@ -93,6 +93,11 @@ class TechnicalAnalysisService:
     def calculate_rsi(self, prices, period=14):
         """Calculate RSI for given prices"""
         try:
+            # Validate period
+            if not isinstance(period, (int, float)) or period <= 0:
+                raise ValueError("RSI period must be a positive number")
+            period = int(period)  # Convert to integer
+            
             if not isinstance(prices, np.ndarray):
                 prices = np.array(prices)
             
@@ -127,7 +132,7 @@ class TechnicalAnalysisService:
             full_rsi = np.full(len(prices), np.nan)
             full_rsi[period:] = rsi[period-1:]
             
-            return full_rsi
+            return pd.Series(full_rsi, index=pd.Series(prices).index)
             
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")

@@ -215,16 +215,16 @@ if symbol:
                         st.write("**Average Volume:**", f"{info.get('averageVolume', 0):,}")
                 
                 with tab2:
-                    # Technical Analysis
-                    with st.spinner('Calculating technical indicators...'):
-                        st.header("Technical Analysis")
+                    st.header("Technical Analysis")
+                    
+                    try:
+                        # Initialize technical analysis with current symbol and data
+                        technical_analysis.symbol = symbol
+                        technical_analysis.data = hist.copy()  # Create a copy of the data
                         
-                        try:
-                            # Initialize technical analysis with current symbol and data
-                            technical_analysis.symbol = symbol
-                            technical_analysis.data = hist.copy()  # Create a copy of the data
-                            
-                            # Calculate indicators
+                        # Calculate indicators with the current periods
+                        rsi = technical_analysis.calculate_rsi(hist['Close'].values, rsi_period)
+                        if rsi is not None:
                             indicators = technical_analysis.calculate_indicators(hist)
                             
                             if indicators and any(v != 'N/A' for v in indicators.values()):
@@ -232,126 +232,30 @@ if symbol:
                                 col1, col2, col3 = st.columns(3)
                                 with col1:
                                     rsi_val = indicators.get('RSI', 'N/A')
-                                    rsi_color = None
-                                    if isinstance(rsi_val, (int, float)):
-                                        if rsi_val > 70:
-                                            rsi_color = "red"
-                                        elif rsi_val < 30:
-                                            rsi_color = "green"
-                                    st.metric("RSI", str(rsi_val), delta_color=rsi_color)
+                                    st.metric("RSI", f"{rsi_val}")
                                     
                                     macd = indicators.get('MACD', 'N/A')
-                                    signal = indicators.get('Signal', 'N/A')
-                                    if isinstance(macd, (int, float)) and isinstance(signal, (int, float)):
-                                        st.metric("MACD", f"{macd:.2f}", f"Signal: {signal:.2f}")
-                                    else:
-                                        st.metric("MACD", "N/A", "Signal: N/A")
+                                    st.metric("MACD", f"{macd}")
                                 
                                 with col2:
                                     ema20 = indicators.get('EMA20', 'N/A')
-                                    ema50 = indicators.get('EMA50', 'N/A')
-                                    if isinstance(ema20, (int, float)):
-                                        st.metric("EMA (20)", f"${ema20:.2f}")
-                                    else:
-                                        st.metric("EMA (20)", "N/A")
+                                    st.metric("EMA 20", f"{ema20}")
                                     
-                                    if isinstance(ema50, (int, float)):
-                                        st.metric("EMA (50)", f"${ema50:.2f}")
-                                    else:
-                                        st.metric("EMA (50)", "N/A")
+                                    signal = indicators.get('Signal', 'N/A')
+                                    st.metric("Signal", f"{signal}")
                                 
                                 with col3:
-                                    bb_upper = indicators.get('BB_Upper', 'N/A')
-                                    bb_middle = indicators.get('BB_Middle', 'N/A')
-                                    bb_lower = indicators.get('BB_Lower', 'N/A')
+                                    ema50 = indicators.get('EMA50', 'N/A')
+                                    st.metric("EMA 50", f"{ema50}")
                                     
-                                    if all(isinstance(x, (int, float)) for x in [bb_upper, bb_middle, bb_lower]):
-                                        st.metric("Bollinger Bands", f"${bb_middle:.2f}", 
-                                                f"Upper: ${bb_upper:.2f} | Lower: ${bb_lower:.2f}")
-                                    else:
-                                        st.metric("Bollinger Bands", "N/A", "Upper: N/A | Lower: N/A")
-                                
-                                # Add technical analysis chart
-                                fig = go.Figure()
-                                
-                                # Add candlestick chart
-                                fig.add_trace(go.Candlestick(
-                                    x=hist.index,
-                                    open=hist['Open'],
-                                    high=hist['High'],
-                                    low=hist['Low'],
-                                    close=hist['Close'],
-                                    name="OHLC"
-                                ))
-                                
-                                # Add EMAs if available
-                                if all(isinstance(x, (int, float)) for x in [ema20, ema50]):
-                                    fig.add_trace(go.Scatter(
-                                        x=hist.index,
-                                        y=hist['Close'].ewm(span=20, adjust=False).mean(),
-                                        name="EMA 20",
-                                        line=dict(color='orange')
-                                    ))
-                                    fig.add_trace(go.Scatter(
-                                        x=hist.index,
-                                        y=hist['Close'].ewm(span=50, adjust=False).mean(),
-                                        name="EMA 50",
-                                        line=dict(color='blue')
-                                    ))
-                                
-                                # Add Bollinger Bands if available
-                                if all(isinstance(x, (int, float)) for x in [bb_upper, bb_middle, bb_lower]):
-                                    fig.add_trace(go.Scatter(
-                                        x=hist.index,
-                                        y=technical_analysis.calculate_bollinger_bands(hist['Close'])[0],
-                                        name="Upper BB",
-                                        line=dict(color='gray', dash='dash')
-                                    ))
-                                    fig.add_trace(go.Scatter(
-                                        x=hist.index,
-                                        y=technical_analysis.calculate_bollinger_bands(hist['Close'])[2],
-                                        name="Lower BB",
-                                        line=dict(color='gray', dash='dash'),
-                                        fill='tonexty'
-                                    ))
-                                
-                                fig.update_layout(
-                                    title="Technical Analysis Chart",
-                                    yaxis_title="Price ($)",
-                                    xaxis_title="Date",
-                                    hovermode='x unified',
-                                    showlegend=True
-                                )
-                                
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Add RSI chart
-                                if isinstance(rsi_val, (int, float)):
-                                    rsi_fig = go.Figure()
-                                    rsi_data = technical_analysis.calculate_rsi(hist['Close'])
-                                    
-                                    rsi_fig.add_trace(go.Scatter(
-                                        x=hist.index,
-                                        y=rsi_data,
-                                        name="RSI"
-                                    ))
-                                    
-                                    # Add overbought/oversold lines
-                                    rsi_fig.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought (70)")
-                                    rsi_fig.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold (30)")
-                                    
-                                    rsi_fig.update_layout(
-                                        title="Relative Strength Index (RSI)",
-                                        yaxis_title="RSI",
-                                        xaxis_title="Date",
-                                        hovermode='x unified'
-                                    )
-                                    
-                                    st.plotly_chart(rsi_fig, use_container_width=True)
+                                    volume = indicators.get('Volume', 'N/A')
+                                    st.metric("Volume", f"{volume:,}" if isinstance(volume, (int, float)) else 'N/A')
                             else:
-                                st.warning("Could not calculate technical indicators. Not enough data points.")
-                        except Exception as e:
-                            st.error(f"Error in technical analysis: {str(e)}")
+                                st.error("Unable to calculate indicators with current settings")
+                        else:
+                            st.error("Not enough data to calculate indicators")
+                    except Exception as e:
+                        st.error(f"Error in technical analysis: {str(e)}")
                 
                 with tab3:
                     # Price Prediction
@@ -399,7 +303,7 @@ if symbol:
                     try:
                         # Calculate technical indicators
                         technical_analysis.data = hist.copy()
-                        rsi_data = technical_analysis.calculate_rsi(hist['Close'].values, period=rsi_period)
+                        rsi_data = technical_analysis.calculate_rsi(hist['Close'].values, rsi_period)  
                         ema_short = technical_analysis.calculate_ema(hist['Close'], period=ma_period)
                         ema_long = technical_analysis.calculate_ema(hist['Close'], period=50)
                         bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'], period=20)
