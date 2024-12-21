@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from services.technical_analysis import TechnicalAnalysisService
 from services.prediction import PredictionService
+from plotly.subplots import make_subplots
 
 # Page config
 st.set_page_config(
@@ -48,8 +49,8 @@ with st.sidebar:
     
     # Add technical analysis settings
     st.subheader("Technical Analysis Settings")
-    rsi_period = st.slider("RSI Period", min_value=7, max_value=21, value=14)
-    ma_period = st.slider("Moving Average Period", min_value=10, max_value=50, value=20)
+    rsi_period = st.slider("RSI Period", min_value=1, max_value=21, value=14)
+    ma_period = st.slider("Moving Average Period", min_value=1, max_value=50, value=20)
     
     # Add auto-refresh option
     auto_refresh = st.checkbox("Auto-refresh data (5min)", value=True)
@@ -297,43 +298,82 @@ if symbol:
                             st.error(f"Error in price prediction: {str(e)}")
                 
                 with tab4:
-                    # Live Chart
-                    with st.spinner('Loading live chart...'):
-                        st.header("Live Chart")
-                        
-                        try:
-                            # Create candlestick chart
-                            fig = go.Figure(data=[go.Candlestick(
-                                x=hist.index,
-                                open=hist['Open'],
-                                high=hist['High'],
-                                low=hist['Low'],
-                                close=hist['Close'],
-                                name="OHLC"
-                            )])
-                            
-                            fig.update_layout(
-                                title=f'{symbol} Stock Price',
-                                yaxis_title='Price ($)',
-                                xaxis_title='Date',
-                                hovermode='x unified'
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Display latest statistics
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                latest_close = hist['Close'].iloc[-1]
-                                first_close = hist['Close'].iloc[0]
-                                change = ((latest_close / first_close) - 1) * 100
-                                st.metric("Latest Close", f"${latest_close:.2f}", f"{change:.1f}%")
-                            with col2:
-                                st.metric("Day High", f"${hist['High'].iloc[-1]:.2f}")
-                            with col3:
-                                st.metric("Day Low", f"${hist['Low'].iloc[-1]:.2f}")
-                        except Exception as e:
-                            st.error(f"Error creating live chart: {str(e)}")
+                    # Live Chart with Technical Analysis
+                    st.header("Live Chart")
+                    
+                    # Calculate technical indicators
+                    technical_analysis.data = hist.copy()
+                    rsi = technical_analysis.calculate_rsi(period=rsi_period)
+                    ema_short = technical_analysis.calculate_ema(hist['Close'], window=ma_period)
+                    ema_long = technical_analysis.calculate_ema(hist['Close'], window=50)
+                    bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(hist['Close'])
+                    
+                    # Create figure with secondary y-axis
+                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                                      vertical_spacing=0.03, 
+                                      row_heights=[0.7, 0.3])
+
+                    # Add candlestick
+                    fig.add_trace(go.Candlestick(x=hist.index,
+                                               open=hist['Open'],
+                                               high=hist['High'],
+                                               low=hist['Low'],
+                                               close=hist['Close'],
+                                               name='OHLC'),
+                                row=1, col=1)
+
+                    # Add EMAs
+                    fig.add_trace(go.Scatter(x=hist.index, y=ema_short,
+                                           line=dict(color='orange', width=1),
+                                           name=f'EMA {ma_period}'),
+                                row=1, col=1)
+                    
+                    fig.add_trace(go.Scatter(x=hist.index, y=ema_long,
+                                           line=dict(color='blue', width=1),
+                                           name='EMA 50'),
+                                row=1, col=1)
+
+                    # Add Bollinger Bands
+                    fig.add_trace(go.Scatter(x=hist.index, y=bb_upper,
+                                           line=dict(color='gray', width=1, dash='dash'),
+                                           name='BB Upper'),
+                                row=1, col=1)
+                    
+                    fig.add_trace(go.Scatter(x=hist.index, y=bb_lower,
+                                           line=dict(color='gray', width=1, dash='dash'),
+                                           name='BB Lower',
+                                           fill='tonexty'),
+                                row=1, col=1)
+
+                    # Add RSI
+                    fig.add_trace(go.Scatter(x=hist.index, y=rsi,
+                                           line=dict(color='purple', width=1),
+                                           name='RSI'),
+                                row=2, col=1)
+
+                    # Add RSI levels
+                    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+                    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+
+                    # Update layout
+                    fig.update_layout(
+                        xaxis_rangeslider_visible=False,
+                        height=800,
+                        title_text=f"{symbol} Technical Analysis",
+                        showlegend=True,
+                        legend=dict(
+                            yanchor="top",
+                            y=0.99,
+                            xanchor="left",
+                            x=0.01
+                        )
+                    )
+
+                    # Update y-axes labels
+                    fig.update_yaxes(title_text="Price", row=1, col=1)
+                    fig.update_yaxes(title_text="RSI", row=2, col=1)
+
+                    st.plotly_chart(fig, use_container_width=True)
             
             else:
                 st.error("Not enough historical data available for analysis")

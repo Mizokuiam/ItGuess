@@ -49,43 +49,49 @@ class PredictionService:
             return None, None
 
     def train_models(self, symbol):
-        """Train all prediction models"""
+        """Train all models with the given data"""
         try:
             # Get historical data
             end_date = datetime.now()
             start_date = end_date - timedelta(days=365)
             data = yf.download(symbol, start=start_date, end=end_date)['Close'].values
             
-            # Store data
-            self.data = data
+            if len(data) < 60:
+                return False
             
             # Prepare data
             x_train, y_train = self.prepare_data(data)
             if x_train is None or y_train is None:
                 return False
-                
-            # Reshape data for LSTM
-            x_train_lstm = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+            
+            # Store data for later use
+            self.data = data
             
             # Train LSTM
+            x_train_lstm = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
             self.lstm_model.fit(x_train_lstm, y_train, epochs=10, batch_size=32, verbose=0)
-            lstm_pred = self.lstm_model.predict(x_train_lstm)
-            self.metrics['lstm_accuracy'] = r2_score(y_train, lstm_pred)
+            lstm_pred = self.lstm_model.predict(x_train_lstm, verbose=0)
+            self.metrics['lstm_accuracy'] = float(r2_score(y_train, lstm_pred))
             
             # Train Random Forest
             x_train_rf = x_train.reshape(x_train.shape[0], -1)
             self.rf_model.fit(x_train_rf, y_train)
             rf_pred = self.rf_model.predict(x_train_rf)
-            self.metrics['rf_accuracy'] = r2_score(y_train, rf_pred)
+            self.metrics['rf_accuracy'] = float(r2_score(y_train, rf_pred))
             
             # Train Linear Regression
             self.lr_model.fit(x_train_rf, y_train)
             lr_pred = self.lr_model.predict(x_train_rf)
-            self.metrics['lr_accuracy'] = r2_score(y_train, lr_pred)
+            self.metrics['lr_accuracy'] = float(r2_score(y_train, lr_pred))
             
             return True
         except Exception as e:
             print(f"Error training models: {str(e)}")
+            self.metrics = {
+                'lstm_accuracy': 0.0,
+                'rf_accuracy': 0.0,
+                'lr_accuracy': 0.0
+            }
             return False
             
     def get_prediction(self, symbol, period='1d'):
