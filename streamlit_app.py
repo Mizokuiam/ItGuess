@@ -574,114 +574,75 @@ if symbol:
                 )
         
         with tabs[2]:  # Price Prediction Tab
-            with st.spinner("Training prediction models..."):
+            with st.spinner("Analyzing technical indicators..."):
                 try:
-                    # Train models if needed
-                    if prediction_service.train_models(symbol):
-                        try:
-                            predictions = prediction_service.predict(symbol)
-                            confidence_intervals = prediction_service.get_confidence_intervals(symbol)
-                            feature_importance = prediction_service.get_feature_importance(symbol)
-                            prediction_history = prediction_service.get_prediction_history(symbol)
+                    predictions = prediction_service.predict(symbol)
+                    confidence_intervals = prediction_service.get_confidence_intervals(symbol)
+                    
+                    if predictions and confidence_intervals:
+                        st.subheader("Technical Analysis Prediction")
+                        
+                        # Get current price
+                        stock = yf.Ticker(symbol)
+                        current_price = stock.history(period="1d")['Close'].iloc[-1]
+                        
+                        # Display prediction
+                        pred_price = predictions['technical']
+                        conf_interval = confidence_intervals[symbol]['technical']
+                        
+                        # Calculate percentage change
+                        price_change = ((pred_price / current_price) - 1) * 100
+                        
+                        # Create columns for prediction display
+                        pred_col1, pred_col2 = st.columns(2)
+                        
+                        with pred_col1:
+                            st.metric(
+                                "Current Price",
+                                f"${current_price:.2f}"
+                            )
                             
-                            if predictions and confidence_intervals:
-                                st.subheader("Price Predictions")
-                                
-                                # Create columns for each model's prediction
-                                rf_col, nn_col = st.columns(2)
-                                
-                                with rf_col:
-                                    st.markdown("### Random Forest Model")
-                                    current_price = stock.history(period="1d")['Close'].iloc[-1]
-                                    predicted_price = predictions['rf']
-                                    price_change = ((predicted_price - current_price) / current_price) * 100
-                                    
-                                    st.metric(
-                                        "Predicted Price",
-                                        f"${predicted_price:.2f}",
-                                        f"{price_change:+.2f}%",
-                                        delta_color="normal"
-                                    )
-                                    
-                                    ci = confidence_intervals['rf']
-                                    st.write(f"Confidence Interval: ${ci[0]:.2f} to ${ci[1]:.2f}")
-                                
-                                with nn_col:
-                                    st.markdown("### Neural Network Model")
-                                    predicted_price = predictions['nn']
-                                    price_change = ((predicted_price - current_price) / current_price) * 100
-                                    
-                                    st.metric(
-                                        "Predicted Price",
-                                        f"${predicted_price:.2f}",
-                                        f"{price_change:+.2f}%",
-                                        delta_color="normal"
-                                    )
-                                    
-                                    ci = confidence_intervals['nn']
-                                    st.write(f"Confidence Interval: ${ci[0]:.2f} to ${ci[1]:.2f}")
-                                
-                                # Show feature importance
-                                if feature_importance:
-                                    st.subheader("Feature Importance")
-                                    importance_df = pd.DataFrame({
-                                        'Feature': feature_importance.keys(),
-                                        'Importance': feature_importance.values()
-                                    }).sort_values('Importance', ascending=False)
-                                    
-                                    fig = go.Figure(go.Bar(
-                                        x=importance_df['Feature'],
-                                        y=importance_df['Importance'],
-                                        marker_color='rgba(126, 86, 218, 0.7)'
-                                    ))
-                                    fig.update_layout(
-                                        title="Feature Importance in Prediction",
-                                        xaxis_title="Features",
-                                        yaxis_title="Importance Score",
-                                        showlegend=False
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Show prediction history
-                                if prediction_history:
-                                    st.subheader("Model Performance History")
-                                    history_df = pd.DataFrame({
-                                        'Actual': prediction_history['actual'],
-                                        'Random Forest': prediction_history['rf_pred'],
-                                        'Neural Network': prediction_history['nn_pred']
-                                    })
-                                    
-                                    fig = go.Figure()
-                                    fig.add_trace(go.Scatter(
-                                        y=history_df['Actual'],
-                                        name='Actual Price',
-                                        line=dict(color='black', width=2)
-                                    ))
-                                    fig.add_trace(go.Scatter(
-                                        y=history_df['Random Forest'],
-                                        name='Random Forest Prediction',
-                                        line=dict(color='blue')
-                                    ))
-                                    fig.add_trace(go.Scatter(
-                                        y=history_df['Neural Network'],
-                                        name='Neural Network Prediction',
-                                        line=dict(color='red')
-                                    ))
-                                    fig.update_layout(
-                                        title="Model Predictions vs Actual Prices",
-                                        xaxis_title="Time",
-                                        yaxis_title="Price",
-                                        hovermode='x unified'
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.error("Unable to generate predictions. Models trained but prediction failed.")
-                        except Exception as e:
-                            st.error(f"Error during prediction: {str(e)}")
+                            st.metric(
+                                "Predicted Price",
+                                f"${pred_price:.2f}",
+                                f"{price_change:+.2f}%",
+                                delta_color="normal"
+                            )
+                        
+                        with pred_col2:
+                            st.metric(
+                                "Lower Bound",
+                                f"${conf_interval[0]:.2f}",
+                                f"{((conf_interval[0]/current_price - 1) * 100):+.2f}%",
+                                delta_color="inverse"
+                            )
+                            
+                            st.metric(
+                                "Upper Bound",
+                                f"${conf_interval[1]:.2f}",
+                                f"{((conf_interval[1]/current_price - 1) * 100):+.2f}%",
+                                delta_color="normal"
+                            )
+                        
+                        # Add prediction explanation
+                        st.markdown("### Analysis Details")
+                        st.markdown("""
+                        This prediction is based on multiple technical indicators including:
+                        - Relative Strength Index (RSI)
+                        - Moving Average Convergence Divergence (MACD)
+                        - Moving Averages (5-day and 20-day)
+                        - Price Momentum
+                        - Volume Analysis
+                        - Bollinger Bands
+                        
+                        The prediction represents a weighted combination of signals from these indicators.
+                        The confidence interval shows the potential price range based on the strength and consistency of these signals.
+                        """)
+                        
                     else:
-                        st.error("Unable to train prediction models. This could be due to insufficient data.")
+                        st.error("Unable to generate predictions. This could be due to insufficient data or invalid technical indicators.")
                 except Exception as e:
-                    st.error(f"Error in prediction tab: {str(e)}")
+                    st.error(f"Error during prediction: {str(e)}")
         
         with tabs[3]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
