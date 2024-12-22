@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 import tensorflow as tf
 from scipy import stats
+import time
 
 class PredictionService:
     def __init__(self):
@@ -20,13 +21,27 @@ class PredictionService:
     def _prepare_data(self, symbol):
         """Prepare data for prediction"""
         try:
-            # Get historical data
-            stock = yf.Ticker(symbol)
-            df = stock.history(period="2y")
+            # Get historical data with retry mechanism
+            max_retries = 3
+            retry_count = 0
+            df = None
             
-            if df.empty:
+            while retry_count < max_retries:
+                try:
+                    stock = yf.Ticker(symbol)
+                    df = stock.history(period="2y")
+                    if not df.empty:
+                        break
+                except Exception as e:
+                    print(f"Attempt {retry_count + 1} failed: {str(e)}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    time.sleep(1)
+            
+            if df is None or df.empty:
+                print(f"Could not fetch data for {symbol} after {max_retries} attempts")
                 return None, None
-                
+            
             # Calculate technical indicators
             df['MA5'] = df['Close'].rolling(window=5).mean()
             df['MA20'] = df['Close'].rolling(window=20).mean()
@@ -38,8 +53,18 @@ class PredictionService:
             # Create features and target
             df = df.dropna()
             
+            # Check if we have enough data
+            if len(df) < 100:  # Need at least 100 data points for meaningful prediction
+                print(f"Insufficient data points for {symbol}: {len(df)} < 100")
+                return None, None
+            
             features = ['Open', 'High', 'Low', 'Close', 'Volume', 
                        'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
+            
+            # Validate features
+            if not all(col in df.columns for col in features):
+                print(f"Missing required features for {symbol}")
+                return None, None
             
             X = df[features].values
             y = df['Close'].values
@@ -73,21 +98,54 @@ class PredictionService:
             # Split data
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
-            # Train Random Forest
-            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf_model.fit(X_train, y_train)
+            # Train Random Forest with error handling
+            try:
+                rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+                rf_model.fit(X_train, y_train)
+                rf_pred = rf_model.predict(X_test)
+                rf_score = r2_score(y_test, rf_pred)
+                print(f"Random Forest R2 Score: {rf_score:.4f}")
+            except Exception as e:
+                print(f"Error training Random Forest: {str(e)}")
+                return False
             
-            # Train Neural Network
-            nn_model = tf.keras.Sequential([
-                tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-                tf.keras.layers.Dropout(0.2),
-                tf.keras.layers.Dense(32, activation='relu'),
-                tf.keras.layers.Dropout(0.1),
-                tf.keras.layers.Dense(1)
-            ])
-            
-            nn_model.compile(optimizer='adam', loss='mse')
-            nn_model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=0)
+            # Train Neural Network with error handling
+            try:
+                nn_model = tf.keras.Sequential([
+                    tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Dropout(0.2),
+                    tf.keras.layers.Dense(32, activation='relu'),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Dropout(0.1),
+                    tf.keras.layers.Dense(1)
+                ])
+                
+                nn_model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+                
+                # Add early stopping
+                early_stopping = tf.keras.callbacks.EarlyStopping(
+                    monitor='val_loss',
+                    patience=5,
+                    restore_best_weights=True
+                )
+                
+                # Train with validation split
+                history = nn_model.fit(
+                    X_train, y_train,
+                    epochs=50,
+                    batch_size=32,
+                    validation_split=0.2,
+                    callbacks=[early_stopping],
+                    verbose=0
+                )
+                
+                nn_pred = nn_model.predict(X_test).flatten()
+                nn_score = r2_score(y_test, nn_pred)
+                print(f"Neural Network R2 Score: {nn_score:.4f}")
+            except Exception as e:
+                print(f"Error training Neural Network: {str(e)}")
+                return False
             
             # Store models
             self.models[symbol] = {
