@@ -1,10 +1,7 @@
-import pandas as pd
-import pandas_ta as ta
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.ensemble import RandomForestRegressor
-from datetime import datetime, timedelta
 import yfinance as yf
+import pandas as pd
+import numpy as np
+import pandas_ta as ta
 
 class TechnicalAnalysisService:
     def __init__(self):
@@ -46,12 +43,12 @@ class TechnicalAnalysisService:
             signal = "Buy" if ma20.iloc[-1] > ma50.iloc[-1] else "Sell"
             
             return {
-                'MA20': ma20,
-                'MA50': ma50,
+                'MA20': ma20.iloc[-1],
+                'MA50': ma50.iloc[-1],
                 'signal': signal
             }
         except:
-            return {'MA20': [], 'MA50': [], 'signal': 'Neutral'}
+            return {'MA20': None, 'MA50': None, 'signal': 'Neutral'}
     
     def _calculate_macd(self):
         """Calculate MACD"""
@@ -69,12 +66,12 @@ class TechnicalAnalysisService:
             signal_str = "Buy" if buy_signal else "Sell"
             
             return {
-                'MACD': macd,
-                'Signal': signal,
+                'MACD': current_macd,
+                'Signal': current_signal,
                 'signal': signal_str
             }
         except:
-            return {'MACD': [], 'Signal': [], 'signal': 'Neutral'}
+            return {'MACD': None, 'Signal': None, 'signal': 'Neutral'}
     
     def _calculate_rsi(self, period=14):
         """Calculate RSI"""
@@ -96,12 +93,11 @@ class TechnicalAnalysisService:
                 signal = "Neutral"
             
             return {
-                'RSI': rsi,
-                'value': current_rsi,
+                'RSI': current_rsi,
                 'signal': signal
             }
         except:
-            return {'RSI': [], 'value': 50, 'signal': 'Neutral'}
+            return {'RSI': None, 'signal': 'Neutral'}
     
     def _calculate_stochastic(self, period=14):
         """Calculate Stochastic Oscillator"""
@@ -124,12 +120,12 @@ class TechnicalAnalysisService:
                 signal = "Neutral"
             
             return {
-                'K': k,
-                'D': d,
+                'K': current_k,
+                'D': current_d,
                 'signal': signal
             }
         except:
-            return {'K': [], 'D': [], 'signal': 'Neutral'}
+            return {'K': None, 'D': None, 'signal': 'Neutral'}
     
     def _calculate_obv(self):
         """Calculate On-Balance Volume"""
@@ -144,12 +140,12 @@ class TechnicalAnalysisService:
             signal = "Buy" if trend == "up" else "Sell"
             
             return {
-                'OBV': obv,
+                'OBV': obv.iloc[-1],
                 'trend': trend,
                 'signal': signal
             }
         except:
-            return {'OBV': [], 'trend': 'neutral', 'signal': 'Neutral'}
+            return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
     
     def _calculate_volume_analysis(self):
         """Analyze volume patterns"""
@@ -172,13 +168,13 @@ class TechnicalAnalysisService:
                 signal = "Neutral"
             
             return {
-                'Volume': volume,
-                'MA20': volume_ma,
+                'Volume': current_volume,
+                'MA20': current_ma,
                 'trend': trend,
                 'signal': signal
             }
         except:
-            return {'Volume': [], 'MA20': [], 'trend': 'neutral', 'signal': 'Neutral'}
+            return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
 
 class PredictionService:
     def __init__(self, data):
