@@ -4,6 +4,7 @@ import numpy as np
 import pandas_ta as ta
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import MinMaxScaler
+import time
 
 class TechnicalAnalysisService:
     def __init__(self):
@@ -12,9 +13,22 @@ class TechnicalAnalysisService:
     def analyze(self, symbol):
         """Analyze stock data and return technical indicators"""
         try:
-            # Get data
-            stock = yf.Ticker(symbol)
-            self.data = stock.history(period="1y")
+            # Get data with retry mechanism
+            max_retries = 3
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                try:
+                    stock = yf.Ticker(symbol)
+                    self.data = stock.history(period="1y")
+                    break
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count == max_retries:
+                        print(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
+                        return None
+                    print(f"Retry {retry_count}/{max_retries} after error: {str(e)}")
+                    time.sleep(1)  # Wait 1 second before retrying
             
             # Validate data
             if self.data is None or self.data.empty:

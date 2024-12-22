@@ -248,12 +248,27 @@ if symbol:
     try:
         # Validate symbol
         stock = yf.Ticker(symbol)
-        info = stock.info
         
-        if not info or 'regularMarketPrice' not in info:
-            st.error(f"Could not find data for symbol: {symbol}")
+        # Try to fetch some basic data first
+        try:
+            hist = stock.history(period="1d")
+            if hist.empty:
+                st.error(f"No trading data available for symbol: {symbol}")
+                st.stop()
+        except Exception as e:
+            st.error(f"Error fetching data for {symbol}: {str(e)}")
             st.stop()
-        
+            
+        # Now try to get company info
+        try:
+            info = stock.info
+            if not info:
+                st.error(f"No company information available for symbol: {symbol}")
+                st.stop()
+        except Exception as e:
+            st.error(f"Error fetching company info for {symbol}: {str(e)}")
+            st.stop()
+            
         # Load company info and logo
         with st.spinner("Loading company information..."):
             company_info = get_company_info(symbol)
