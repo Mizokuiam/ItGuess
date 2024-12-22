@@ -248,18 +248,47 @@ def get_company_info(symbol):
     except:
         return None
 
-def display_company_logo(info):
+def display_company_logo(symbol):
     """Display company logo if available"""
     try:
-        if 'logo_url' in info and info['logo_url']:
-            response = requests.get(info['logo_url'])
+        # Try to get logo from different sources
+        logo_url = None
+        
+        # Try Wikipedia logo first
+        try:
+            response = requests.get(f"https://logo.clearbit.com/{symbol.lower()}.com")
             if response.status_code == 200:
-                image = Image.open(BytesIO(response.content))
-                st.image(image, width=100)
-            else:
-                print(f"Failed to fetch logo: {response.status_code}")
+                logo_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
+        except:
+            pass
+        
+        # Try Clearbit as backup
+        if not logo_url:
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                website = info.get('website', '')
+                if website:
+                    domain = website.replace('http://', '').replace('https://', '').split('/')[0]
+                    logo_url = f"https://logo.clearbit.com/{domain}"
+            except:
+                pass
+        
+        # Display logo if found
+        if logo_url:
+            try:
+                response = requests.get(logo_url)
+                if response.status_code == 200:
+                    image = Image.open(BytesIO(response.content))
+                    st.image(image, width=100)
+                    return True
+            except:
+                pass
+        
+        return False
     except Exception as e:
         print(f"Error displaying logo: {str(e)}")
+        return False
 
 # Initialize services
 def get_services():
@@ -366,10 +395,9 @@ if symbol:
         # Main header with company info
         col1, col2 = st.columns([1, 3])
         with col1:
-            if company_logo:
-                st.image(company_logo, width=100)
-            else:
-                st.markdown(f"<div class='company-symbol'>{symbol}</div>", unsafe_allow_html=True)
+            if not display_company_logo(symbol):
+                # If logo not found, display a placeholder
+                st.markdown("📈")
                 
         with col2:
             if company_info:
@@ -390,7 +418,9 @@ if symbol:
                     
                     with col1:
                         # Display company logo
-                        display_company_logo(info)
+                        if not display_company_logo(symbol):
+                            # If logo not found, display a placeholder
+                            st.markdown("📈")
                     
                     with col2:
                         # Display company name as title
