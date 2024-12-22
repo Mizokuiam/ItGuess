@@ -55,68 +55,114 @@ st.markdown("""
     
     .app-title {
         font-family: 'Segoe UI', sans-serif;
-        font-size: 4em;
-        font-weight: 800;
+        font-size: 5em;
+        font-weight: 900;
         text-align: center;
-        margin: 20px 0;
-        background: linear-gradient(120deg, var(--gradient-start), var(--gradient-mid), var(--gradient-end));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        letter-spacing: 3px;
+        margin: 40px 0 20px;
+        color: var(--text-color);
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.15);
+        letter-spacing: 4px;
     }
     
     .app-subtitle {
         font-family: 'Segoe UI', sans-serif;
-        font-size: 1.2em;
+        font-size: 1.4em;
         text-align: center;
         color: var(--text-color);
-        margin-bottom: 30px;
-        opacity: 0.8;
+        margin-bottom: 40px;
+        opacity: 0.9;
+        font-weight: 500;
     }
     
-    .feature-grid {
+    /* Typing animation */
+    @keyframes typing {
+        from { width: 0 }
+        to { width: 100% }
+    }
+    
+    @keyframes blink {
+        50% { border-color: transparent }
+    }
+    
+    .typing-container {
+        display: flex;
+        justify-content: center;
+        margin: 30px 0;
+    }
+    
+    .typing-text {
+        font-family: 'Consolas', monospace;
+        font-size: 1.3em;
+        color: var(--text-color);
+        border-right: 3px solid var(--text-color);
+        white-space: nowrap;
+        overflow: hidden;
+        animation: 
+            typing 3.5s steps(40, end),
+            blink .75s step-end infinite;
+        margin: 0 auto;
+        max-width: fit-content;
+    }
+    
+    /* Feature cards */
+    .features-container {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-        padding: 20px;
-        margin-top: 30px;
+        gap: 30px;
+        padding: 40px;
+        max-width: 1200px;
+        margin: 0 auto;
     }
     
-    .feature-box {
-        background: linear-gradient(145deg, var(--card-background), var(--hover-color));
-        border: 1px solid var(--border-color);
-        border-radius: 15px;
-        padding: 25px;
+    .feature-card {
+        background: var(--card-background);
+        border-radius: 20px;
+        padding: 30px;
         text-align: center;
-        transition: all 0.3s ease;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: 1px solid var(--border-color);
     }
     
-    .feature-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
     }
     
     .feature-icon {
-        font-size: 2.5em;
-        margin-bottom: 15px;
-        background: linear-gradient(120deg, var(--gradient-start), var(--gradient-end));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 3em;
+        margin-bottom: 20px;
+        display: inline-block;
+        padding: 20px;
+        background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+        border-radius: 50%;
+        color: white;
     }
     
     .feature-title {
-        color: var(--text-color);
-        font-size: 1.3em;
+        font-size: 1.5em;
         font-weight: 600;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
+        color: var(--text-color);
     }
     
-    .feature-desc {
+    .feature-description {
         color: var(--text-color);
-        font-size: 1em;
-        line-height: 1.5;
+        line-height: 1.6;
+        font-size: 1.1em;
         opacity: 0.9;
+    }
+    
+    /* Search box with improved styling */
+    .search-container {
+        display: flex;
+        justify-content: center;
+        margin: 30px 0;
+    }
+    
+    .search-text {
+        font-size: 1.2em;
+        color: var(--text-color);
+        margin: 0;
     }
     
     .search-prompt {
@@ -126,12 +172,6 @@ st.markdown("""
         background: linear-gradient(145deg, var(--card-background), var(--hover-color));
         border-radius: 15px;
         border: 1px solid var(--border-color);
-    }
-    
-    .search-text {
-        font-size: 1.2em;
-        color: var(--text-color);
-        margin: 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -315,34 +355,40 @@ if not symbol:  # Show welcome page when no symbol is entered
     st.markdown('<h1 class="app-title">ItGuess</h1>', unsafe_allow_html=True)
     st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
     
-    # Search box with example
+    # Animated search prompt
     st.markdown("""
-        <div class="search-prompt">
-            <p class="search-text">
+        <div class="typing-container">
+            <div class="typing-text">
                 Enter a stock symbol to begin (e.g., AAPL for Apple Inc.)
-            </p>
+            </div>
         </div>
     """, unsafe_allow_html=True)
     
-    # Feature grid
+    # Feature cards
     st.markdown("""
-        <div class="feature-grid">
-            <div class="feature-box">
+        <div class="features-container">
+            <div class="feature-card">
                 <div class="feature-icon">📊</div>
                 <div class="feature-title">Technical Analysis</div>
-                <div class="feature-desc">Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.</div>
+                <div class="feature-description">
+                    Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis
+                </div>
             </div>
             
-            <div class="feature-box">
+            <div class="feature-card">
                 <div class="feature-icon">🤖</div>
                 <div class="feature-title">Price Prediction</div>
-                <div class="feature-desc">AI-powered price predictions based on technical analysis and market patterns.</div>
+                <div class="feature-description">
+                    AI-powered price predictions based on technical analysis and market patterns
+                </div>
             </div>
             
-            <div class="feature-box">
+            <div class="feature-card">
                 <div class="feature-icon">📈</div>
                 <div class="feature-title">Live Charts</div>
-                <div class="feature-desc">Real-time interactive charts with customizable indicators and time periods.</div>
+                <div class="feature-description">
+                    Real-time interactive charts with customizable indicators and time periods
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
