@@ -544,232 +544,73 @@ if symbol:
                 analysis_data = technical_analysis.analyze(symbol)
                 
                 if analysis_data is None:
-                    st.error("Unable to calculate technical indicators. This could be due to insufficient data or invalid symbol.")
-                    st.stop()
-                
-                # Create three columns for different indicator categories
-                trend_col, momentum_col, volume_col = st.columns(3)
-                
-                with trend_col:
-                    st.subheader("Trend Indicators")
+                    st.error("Unable to perform technical analysis")
+                else:
+                    # Display technical indicators in columns
+                    col1, col2, col3 = st.columns(3)
                     
-                    # MA Cross
-                    ma_data = analysis_data['ma_cross']
-                    if ma_data['MA20'] is not None and ma_data['MA50'] is not None:
-                        st.write("Moving Average Crossover")
-                        st.write(f"MA20: {ma_data['MA20']:.2f}")
-                        st.write(f"MA50: {ma_data['MA50']:.2f}")
-                        st.write(f"Signal: {ma_data['signal']}")
-                    else:
-                        st.warning("Moving Average data not available")
+                    with col1:
+                        st.subheader("MACD")
+                        macd_data = analysis_data['macd']
+                        st.metric("MACD", f"{macd_data['macd']:.2f}")
+                        st.metric("Signal", f"{macd_data['signal']:.2f}")
+                        st.metric("Signal", macd_data['interpretation'])
                     
-                    # MACD
-                    macd_data = analysis_data['macd']
-                    if macd_data['MACD'] is not None and macd_data['Signal'] is not None:
-                        st.write("Moving Average Convergence Divergence (MACD)")
-                        st.write(f"MACD: {macd_data['MACD']:.2f}")
-                        st.write(f"Signal: {macd_data['Signal']:.2f}")
-                        st.write(f"Signal: {macd_data['signal']}")
-                    else:
-                        st.warning("MACD data not available")
-                
-                with momentum_col:
-                    st.subheader("Momentum Indicators")
+                    with col2:
+                        st.subheader("Stochastic Oscillator")
+                        stoch_data = analysis_data['stochastic']
+                        st.metric("K", f"{stoch_data['k']:.2f}")
+                        st.metric("D", f"{stoch_data['d']:.2f}")
+                        st.metric("Signal", stoch_data['interpretation'])
                     
-                    # RSI
-                    rsi_data = analysis_data['rsi']
-                    if rsi_data['RSI'] is not None:
-                        st.write("Relative Strength Index (RSI)")
-                        st.write(f"RSI: {rsi_data['RSI']:.2f}")
-                        st.write(f"Signal: {rsi_data['signal']}")
-                    else:
-                        st.warning("RSI data not available")
-                        
-                    # Stochastic
-                    stoch_data = analysis_data['stochastic']
-                    if stoch_data['K'] is not None and stoch_data['D'] is not None:
-                        st.write("Stochastic Oscillator")
-                        st.write(f"K: {stoch_data['K']:.2f}")
-                        st.write(f"D: {stoch_data['D']:.2f}")
-                        st.write(f"Signal: {stoch_data['signal']}")
-                    else:
-                        st.warning("Stochastic data not available")
-                
-                with volume_col:
-                    st.subheader("Volume Indicators")
+                    with col3:
+                        st.subheader("Volume Analysis")
+                        volume_data = analysis_data['volume']
+                        st.metric("Volume", f"{volume_data['volume']:,.2f}")
+                        st.metric("Signal", volume_data['interpretation'])
                     
-                    # OBV
-                    obv_data = analysis_data['obv']
-                    if obv_data['OBV'] is not None:
-                        st.write("On-Balance Volume (OBV)")
-                        st.write(f"OBV: {obv_data['OBV']:.2f}")
-                        st.write(f"Signal: {obv_data['signal']}")
-                    else:
-                        st.warning("OBV data not available")
+                    # Technical Analysis Summary at the bottom
+                    st.markdown("### Technical Analysis Summary")
                     
-                    # Volume
-                    volume_data = analysis_data['volume']
-                    if volume_data['Volume'] is not None:
-                        st.write("Volume Analysis")
-                        st.write(f"Volume: {volume_data['Volume']:.2f}")
-                        st.write(f"Signal: {volume_data['signal']}")
-                    else:
-                        st.warning("Volume data not available")
+                    # Calculate overall signal
+                    buy_signals = sum(1 for x in [macd_data['interpretation'], 
+                                                stoch_data['interpretation'], 
+                                                volume_data['interpretation']] 
+                                    if x == 'Buy')
+                    sell_signals = sum(1 for x in [macd_data['interpretation'], 
+                                                 stoch_data['interpretation'], 
+                                                 volume_data['interpretation']] 
+                                     if x == 'Sell')
                     
-                    # Technical Analysis Summary
-                    st.subheader("Technical Analysis Summary")
-                    signals = [
-                        analysis_data['ma_cross']['signal'],
-                        analysis_data['macd']['signal'],
-                        analysis_data['rsi']['signal'],
-                        analysis_data['stochastic']['signal'],
-                        analysis_data['obv']['signal']
-                    ]
+                    signal_color = "green" if buy_signals > sell_signals else "red"
+                    signal_text = "Buy" if buy_signals > sell_signals else "Sell"
                     
-                    buy_signals = sum(1 for s in signals if s == "Buy")
-                    sell_signals = sum(1 for s in signals if s == "Sell")
-                    
-                    summary = (
-                        "Strong Buy" if buy_signals >= 4 else
-                        "Buy" if buy_signals > sell_signals else
-                        "Strong Sell" if sell_signals >= 4 else
-                        "Sell" if sell_signals > buy_signals else
-                        "Neutral"
-                    )
-                    
-                    st.metric(
-                        "Overall Signal",
-                        summary,
-                        delta=f"{buy_signals} Buy vs {sell_signals} Sell signals"
-                    )
-                    
-                # Technical Analysis Summary
-                st.subheader("Technical Analysis Summary")
-                signals = [
-                    analysis_data['ma_cross']['signal'],
-                    analysis_data['macd']['signal'],
-                    analysis_data['rsi']['signal'],
-                    analysis_data['stochastic']['signal'],
-                    analysis_data['obv']['signal']
-                ]
-                
-                buy_signals = sum(1 for s in signals if s == "Buy")
-                sell_signals = sum(1 for s in signals if s == "Sell")
-                
-                summary = (
-                    "Strong Buy" if buy_signals >= 4 else
-                    "Buy" if buy_signals > sell_signals else
-                    "Strong Sell" if sell_signals >= 4 else
-                    "Sell" if sell_signals > buy_signals else
-                    "Neutral"
-                )
-                
-                st.metric(
-                    "Overall Signal",
-                    summary,
-                    delta=f"{buy_signals} Buy vs {sell_signals} Sell signals"
-                )
-        
-        with tabs[2]:  # Price Prediction Tab
-            with st.spinner("Analyzing technical indicators..."):
-                try:
-                    # Fetch more data than needed to ensure we have enough
-                    stock = yf.Ticker(symbol)
-                    hist = stock.history(period="3mo")  # Fetch 3 months instead of 60 days
-                    
-                    print(f"\nFetching data for {symbol}")
-                    print(f"Data shape: {hist.shape}")
-                    print(f"Date range: {hist.index[0]} to {hist.index[-1]}")
-                    
-                    # Filter to last 60 days if we have more
-                    hist = hist.last('60D')
-                    
-                    if len(hist) < 20:
-                        st.error(f"Insufficient historical data for {symbol}. Found {len(hist)} days, need at least 20 days of trading data.")
-                        print(f"Available data points: {len(hist)}")
-                        print(f"Date range after filtering: {hist.index[0]} to {hist.index[-1]}")
-                        st.stop()
-                    
-                    print(f"\nMaking prediction for {symbol}")
-                    print(f"Using {len(hist)} days of historical data")
-                    print(f"Data columns: {hist.columns.tolist()}")
-                    
-                    predictions = prediction_service.predict(symbol)
-                    if predictions is None:
-                        st.error("Unable to generate predictions. Check the logs for details.")
-                        st.stop()
-                        
-                    confidence_intervals = prediction_service.get_confidence_intervals(symbol)
-                    if confidence_intervals is None:
-                        st.error("Unable to calculate confidence intervals.")
-                        st.stop()
-                    
-                    if predictions and confidence_intervals:
-                        st.subheader("Technical Analysis Prediction")
-                        
-                        # Get current price
-                        current_price = hist['Close'].iloc[-1]
-                        
-                        # Display prediction
-                        pred_price = predictions['technical']
-                        conf_interval = confidence_intervals[symbol]['technical']
-                        
-                        # Calculate percentage change
-                        price_change = ((pred_price / current_price) - 1) * 100
-                        
-                        # Create columns for prediction display
-                        pred_col1, pred_col2 = st.columns(2)
-                        
-                        with pred_col1:
-                            st.metric(
-                                "Current Price",
-                                f"${current_price:.2f}"
-                            )
-                            
-                            st.metric(
-                                "Predicted Price",
-                                f"${pred_price:.2f}",
-                                f"{price_change:+.2f}%",
-                                delta_color="normal"
-                            )
-                        
-                        with pred_col2:
-                            st.metric(
-                                "Lower Bound",
-                                f"${conf_interval[0]:.2f}",
-                                f"{((conf_interval[0]/current_price - 1) * 100):+.2f}%",
-                                delta_color="inverse"
-                            )
-                            
-                            st.metric(
-                                "Upper Bound",
-                                f"${conf_interval[1]:.2f}",
-                                f"{((conf_interval[1]/current_price - 1) * 100):+.2f}%",
-                                delta_color="normal"
-                            )
-                        
-                        # Add prediction explanation
-                        st.markdown("### Analysis Details")
-                        st.markdown("""
-                        This prediction is based on multiple technical indicators including:
-                        - Relative Strength Index (RSI)
-                        - Moving Average Convergence Divergence (MACD)
-                        - Moving Averages (5-day and 20-day)
-                        - Price Momentum
-                        - Volume Analysis
-                        - Bollinger Bands
-                        
-                        The prediction represents a weighted combination of signals from these indicators.
-                        The confidence interval shows the potential price range based on the strength and consistency of these signals.
-                        """)
-                        
-                    else:
-                        st.error("Unable to generate predictions. This could be due to insufficient data or invalid technical indicators.")
-                except Exception as e:
-                    st.error(f"Error during prediction: {str(e)}")
-                    print(f"Error details: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
+                    st.markdown(f"""
+                    <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+                        <h2 style='color: {signal_color};'>{signal_text}</h2>
+                        <p style='color: #666;'>↑ {buy_signals} Buy vs ↓ {sell_signals} Sell signals</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with tabs[2]:  # News Sentiment Tab
+            st.subheader("News Sentiment Analysis")
+            
+            # Fetch news data
+            news_data = news_service.get_news(symbol)
+            
+            if news_data and not news_data.empty and len(news_data) > 0:
+                # Display news with sentiment
+                for _, row in news_data.iterrows():
+                    with st.container():
+                        st.markdown(f"""
+                        <div style='padding: 10px; border-left: 4px solid {row['sentiment_color']}; margin: 10px 0;'>
+                            <h4>{row['title']}</h4>
+                            <p>{row['summary']}</p>
+                            <p style='color: #666; font-size: 0.8em;'>{row['date']} • Sentiment: {row['sentiment']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Fetching latest news... Please check back in a few minutes.")
         
         with tabs[3]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
