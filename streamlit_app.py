@@ -48,57 +48,55 @@ st.markdown("""
     }
     
     .feature-box {
-        background-color: var(--card-background);
+        background: linear-gradient(145deg, var(--card-background), var(--hover-color));
         border: 1px solid var(--border-color);
-        border-radius: 10px;
-        padding: 20px;
-        margin: 10px;
-        transition: transform 0.2s;
+        border-radius: 15px;
+        padding: 25px;
+        text-align: center;
+        transition: all 0.3s ease;
     }
     
     .feature-box:hover {
         transform: translateY(-5px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
     }
     
-    .feature-title {
-        color: var(--text-color);
-        font-size: 1.2em;
-        font-weight: bold;
-        margin-bottom: 10px;
-    }
-    
-    .feature-desc {
-        color: var(--text-color);
-        font-size: 0.9em;
-    }
-    
-    .gradient-text {
-        background: linear-gradient(45deg, #1e88e5, #64b5f6);
+    .feature-icon {
+        font-size: 2.5em;
+        margin-bottom: 15px;
+        background: linear-gradient(120deg, #00ff88, #00bfff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 2em;
-        font-weight: bold;
     }
     
-    .metric-card {
-        background-color: var(--card-background);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 15px;
-        margin: 5px;
+    .ai-title {
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 4em;
+        font-weight: 800;
+        text-align: center;
+        margin: 20px 0;
+        background: linear-gradient(120deg, #00ff88, #00bfff, #7b68ee);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        letter-spacing: 3px;
     }
     
-    .metric-value {
+    .ai-subtitle {
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 1.2em;
+        text-align: center;
         color: var(--text-color);
-        font-size: 1.5em;
-        font-weight: bold;
-    }
-    
-    .metric-label {
-        color: var(--text-color);
-        font-size: 0.9em;
+        margin-bottom: 30px;
         opacity: 0.8;
+    }
+    
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        padding: 20px;
+        margin-top: 30px;
     }
     
     /* Plotly chart customization */
@@ -328,7 +326,61 @@ with st.sidebar:
             st.rerun()
 
 # Main content
-if symbol:
+if not symbol:  # Show welcome page when no symbol is entered
+    st.markdown('<h1 class="ai-title">StockAI Insight</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="ai-subtitle">Advanced Stock Analysis & Prediction Platform Powered by AI</p>', unsafe_allow_html=True)
+    
+    # Search box with example
+    st.markdown("""
+        <div style="text-align: center; padding: 20px;">
+            <p style="font-size: 1.2em; color: var(--text-color);">
+                Enter a stock symbol to begin (e.g., AAPL for Apple Inc.)
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Feature grid
+    st.markdown("""
+        <div class="feature-grid">
+            <div class="feature-box">
+                <div class="feature-icon">🤖</div>
+                <div class="feature-title">AI-Powered Analysis</div>
+                <div class="feature-desc">Advanced machine learning algorithms for accurate stock predictions and trend analysis</div>
+            </div>
+            
+            <div class="feature-box">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Technical Indicators</div>
+                <div class="feature-desc">Comprehensive technical analysis with MACD, RSI, and moving averages</div>
+            </div>
+            
+            <div class="feature-box">
+                <div class="feature-icon">📈</div>
+                <div class="feature-title">Real-Time Charts</div>
+                <div class="feature-desc">Interactive live charts with customizable timeframes and indicators</div>
+            </div>
+            
+            <div class="feature-box">
+                <div class="feature-icon">🎯</div>
+                <div class="feature-title">Price Predictions</div>
+                <div class="feature-desc">Future price predictions using advanced neural networks and historical data</div>
+            </div>
+            
+            <div class="feature-box">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">Responsive Design</div>
+                <div class="feature-desc">Seamless experience across all devices with dark/light mode support</div>
+            </div>
+            
+            <div class="feature-box">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-title">Real-Time Data</div>
+                <div class="feature-desc">Live market data and instant technical analysis updates</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+else:  # Show stock analysis when symbol is entered
     try:
         # Validate symbol and get info
         stock = yf.Ticker(symbol)
