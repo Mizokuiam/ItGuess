@@ -13,6 +13,7 @@ class NewsService:
     def get_company_news(self, symbol, company_name):
         """Get news articles for a company from multiple sources"""
         try:
+            print(f"\nFetching news for {symbol} ({company_name})")
             all_articles = []
             
             # Get NewsAPI articles
@@ -29,7 +30,8 @@ class NewsService:
                         if article.get('publishedAt'):
                             try:
                                 date = pd.to_datetime(article['publishedAt'])
-                            except:
+                            except Exception as e:
+                                print(f"Error parsing NewsAPI date: {str(e)}")
                                 pass
                         
                         all_articles.append({
@@ -59,7 +61,8 @@ class NewsService:
                         if article.get('datetime'):
                             try:
                                 date = datetime.fromtimestamp(int(article['datetime']))
-                            except:
+                            except Exception as e:
+                                print(f"Error parsing Finnhub date: {str(e)}")
                                 pass
                         
                         all_articles.append({
@@ -75,10 +78,13 @@ class NewsService:
                         print(f"Error processing Finnhub article: {str(e)}")
                         continue
             
+            print(f"Total articles collected: {len(all_articles)}")
+            
             # Create DataFrame
             df = pd.DataFrame(all_articles)
             
             if not df.empty:
+                print("Processing articles...")
                 # Calculate sentiment for all articles
                 df['sentiment'] = df.apply(
                     lambda row: self._calculate_sentiment(row['title'], row['summary']), 
@@ -96,6 +102,9 @@ class NewsService:
                 
                 # Reset index
                 df = df.reset_index(drop=True)
+                print(f"Processed {len(df)} articles successfully")
+            else:
+                print("No articles found in DataFrame")
             
             return df
             
@@ -110,6 +119,7 @@ class NewsService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=7)
             
+            print(f"Fetching NewsAPI articles for: {company_name}")
             response = self.newsapi.get_everything(
                 q=company_name,
                 language='en',
@@ -120,6 +130,7 @@ class NewsService:
             )
             
             articles = response.get('articles', [])
+            print(f"NewsAPI returned {len(articles)} articles")
             return articles if articles else []
             
         except Exception as e:
@@ -132,12 +143,14 @@ class NewsService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=7)
             
+            print(f"Fetching Finnhub articles for symbol: {symbol}")
             news = self.finnhub_client.company_news(
                 symbol, 
                 _from=start_date.strftime('%Y-%m-%d'),
                 to=end_date.strftime('%Y-%m-%d')
             )
             
+            print(f"Finnhub returned {len(news) if news else 0} articles")
             return news if news else []
             
         except Exception as e:
