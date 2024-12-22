@@ -7,8 +7,30 @@ import finnhub
 
 class NewsService:
     def __init__(self):
-        self.newsapi = NewsApiClient(api_key='168ee0f418f14fcf8f88cdd1b6bf5963')
-        self.finnhub_client = finnhub.Client(api_key='ctjutipr01quipmv6v3gctjutipr01quipmv6v40')
+        try:
+            self.newsapi = NewsApiClient(api_key='168ee0f418f14fcf8f88cdd1b6bf5963')
+            # Test NewsAPI connection
+            test_response = self.newsapi.get_everything(
+                q='AAPL',
+                language='en',
+                page_size=1
+            )
+            print("NewsAPI connection successful")
+        except Exception as e:
+            print(f"Error initializing NewsAPI: {str(e)}")
+            self.newsapi = None
+
+        try:
+            self.finnhub_client = finnhub.Client(api_key='ctjutipr01quipmv6v3gctjutipr01quipmv6v40')
+            # Test Finnhub connection
+            test_news = self.finnhub_client.company_news('AAPL', 
+                _from='2023-12-01', 
+                to='2023-12-31'
+            )
+            print("Finnhub connection successful")
+        except Exception as e:
+            print(f"Error initializing Finnhub: {str(e)}")
+            self.finnhub_client = None
 
     def get_company_news(self, symbol, company_name):
         """Get news articles for a company from multiple sources"""
@@ -115,12 +137,16 @@ class NewsService:
     def _get_newsapi_articles(self, company_name):
         """Get recent articles from NewsAPI"""
         try:
-            # Get news from the last 7 days
+            if not self.newsapi:
+                print("NewsAPI client not initialized")
+                return []
+
+            # Get news from the last 30 days to ensure we get some results
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=7)
+            start_date = end_date - timedelta(days=30)
             
-            # Create a more focused search query
-            search_query = f'"{company_name}" AND (stock OR shares OR market OR trading OR earnings OR investors)'
+            # Create a simpler search query first
+            search_query = company_name
             print(f"Fetching NewsAPI articles with query: {search_query}")
             
             response = self.newsapi.get_everything(
@@ -129,27 +155,16 @@ class NewsService:
                 sort_by='publishedAt',
                 from_param=start_date.date().isoformat(),
                 to=end_date.date().isoformat(),
-                page_size=30  # Increased to get more relevant articles
+                page_size=100  # Get more articles
             )
             
             articles = response.get('articles', [])
             print(f"NewsAPI returned {len(articles)} articles")
+            print("Sample article titles:")
+            for article in articles[:3]:
+                print(f"- {article.get('title', 'No title')}")
             
-            # Filter articles to ensure they are relevant to the company
-            filtered_articles = []
-            company_terms = company_name.lower().split()
-            
-            for article in articles:
-                title = article.get('title', '').lower()
-                description = article.get('description', '').lower()
-                content = title + ' ' + description
-                
-                # Check if any company term is in the content
-                if any(term in content for term in company_terms):
-                    filtered_articles.append(article)
-            
-            print(f"After filtering, keeping {len(filtered_articles)} relevant articles")
-            return filtered_articles
+            return articles
             
         except Exception as e:
             print(f"Error fetching NewsAPI articles: {str(e)}")
@@ -158,8 +173,13 @@ class NewsService:
     def _get_finnhub_articles(self, symbol):
         """Get recent articles from Finnhub"""
         try:
+            if not self.finnhub_client:
+                print("Finnhub client not initialized")
+                return []
+
+            # Get news from the last 30 days
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=7)
+            start_date = end_date - timedelta(days=30)
             
             print(f"Fetching Finnhub articles for symbol: {symbol}")
             news = self.finnhub_client.company_news(
@@ -169,12 +189,10 @@ class NewsService:
             )
             
             if news:
-                # Sort by datetime to get most recent first
-                news.sort(key=lambda x: x.get('datetime', 0), reverse=True)
-                # Take top 30 most recent articles
-                news = news[:30]
+                print("Sample Finnhub headlines:")
+                for article in news[:3]:
+                    print(f"- {article.get('headline', 'No headline')}")
             
-            print(f"Finnhub returned {len(news) if news else 0} articles")
             return news if news else []
             
         except Exception as e:
