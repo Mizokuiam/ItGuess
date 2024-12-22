@@ -490,4 +490,64 @@ elif symbol:  # Show stock analysis when symbol is entered
                     if 'longBusinessSummary' in info:
                         st.subheader("Company Description")
                         st.write(info['longBusinessSummary'])
-{{ ... }}
+            except Exception as e:
+                st.error(f"Error in Overview tab: {str(e)}")
+        
+        with tabs[1]:  # Technical Analysis Tab
+            with st.spinner("Calculating technical indicators..."):
+                # Get technical analysis data
+                analysis_data = technical_analysis.analyze(symbol)
+                
+                if analysis_data is None:
+                    st.error("Unable to perform technical analysis")
+                else:
+                    # Display technical indicators in columns
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.subheader("MACD")
+                        macd_data = analysis_data['macd']
+                        st.metric(
+                            "MACD",
+                            f"{macd_data['macd']:.2f}",
+                            f"{macd_data['signal']:.2f}"
+                        )
+                        st.metric("Signal", macd_data['interpretation'])
+                    
+                    with col2:
+                        st.subheader("Stochastic Oscillator")
+                        stoch_data = analysis_data['stochastic']
+                        st.metric("K", f"{stoch_data['k']:.2f}")
+                        st.metric("D", f"{stoch_data['d']:.2f}")
+                        st.metric("Signal", stoch_data['interpretation'])
+                    
+                    with col3:
+                        st.subheader("Volume Analysis")
+                        volume_data = analysis_data['volume']
+                        st.metric("Volume", f"{volume_data['volume']:,.2f}")
+                        st.metric("Signal", volume_data['interpretation'])
+                    
+                    # Technical Analysis Summary
+                    st.markdown("### Technical Analysis Summary")
+                    
+                    # Calculate overall signal
+                    buy_signals = sum(1 for x in [macd_data['interpretation'], 
+                                                stoch_data['interpretation'], 
+                                                volume_data['interpretation']] 
+                                    if x == 'Buy')
+                    sell_signals = sum(1 for x in [macd_data['interpretation'], 
+                                                 stoch_data['interpretation'], 
+                                                 volume_data['interpretation']] 
+                                     if x == 'Sell')
+                    
+                    signal_color = "green" if buy_signals > sell_signals else "red"
+                    signal_text = "Buy" if buy_signals > sell_signals else "Sell"
+                    
+                    st.markdown(f"""
+                    <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);'>
+                        <h2 style='color: {signal_color};'>{signal_text}</h2>
+                        <p style='color: #666;'>↑ {buy_signals} Buy vs ↓ {sell_signals} Sell signals</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Error in main content: {str(e)}")
