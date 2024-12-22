@@ -8,6 +8,8 @@ from plotly.subplots import make_subplots
 import requests
 from PIL import Image
 from io import BytesIO
+from services.technical_analysis import TechnicalAnalysisService
+from services.prediction import PredictionService
 
 # Configure Streamlit theme
 st.set_page_config(
