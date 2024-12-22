@@ -17,56 +17,63 @@ class NewsService:
             
             # Get NewsAPI articles
             newsapi_articles = self._get_newsapi_articles(company_name)
-            for article in newsapi_articles:
-                try:
-                    # Parse the date properly
-                    date = datetime.now().isoformat()
-                    if article.get('publishedAt'):
-                        try:
-                            # NewsAPI returns dates in ISO 8601 format
-                            date = pd.to_datetime(article['publishedAt']).isoformat()
-                        except:
-                            pass
-                    
-                    all_articles.append({
-                        'title': article.get('title', ''),
-                        'summary': article.get('description', ''),
-                        'url': article.get('url', ''),
-                        'date': date,
-                        'source': article.get('source', {}).get('name', 'NewsAPI'),
-                        'sentiment': None,
-                        'sentiment_category': None
-                    })
-                except Exception as e:
-                    print(f"Error processing NewsAPI article: {str(e)}")
-                    continue
+            if newsapi_articles and isinstance(newsapi_articles, list):
+                for article in newsapi_articles:
+                    try:
+                        # Ensure we have required fields
+                        if not article.get('title') or not article.get('url'):
+                            continue
+                            
+                        # Get the date, defaulting to now if not available
+                        date = datetime.now()
+                        if article.get('publishedAt'):
+                            try:
+                                date = pd.to_datetime(article['publishedAt'])
+                            except:
+                                pass
+                        
+                        all_articles.append({
+                            'title': article['title'],
+                            'summary': article.get('description', ''),
+                            'url': article['url'],
+                            'date': date.isoformat(),
+                            'source': article.get('source', {}).get('name', 'NewsAPI'),
+                            'sentiment': None,
+                            'sentiment_category': None
+                        })
+                    except Exception as e:
+                        print(f"Error processing NewsAPI article: {str(e)}")
+                        continue
             
             # Get Finnhub articles
             finnhub_articles = self._get_finnhub_articles(symbol)
-            for article in finnhub_articles:
-                try:
-                    # Parse the date properly
-                    date = datetime.now().isoformat()
-                    if article.get('datetime'):
-                        try:
-                            # Finnhub returns Unix timestamp
-                            timestamp = int(article['datetime'])
-                            date = datetime.fromtimestamp(timestamp).isoformat()
-                        except:
-                            pass
-                    
-                    all_articles.append({
-                        'title': article.get('headline', ''),
-                        'summary': article.get('summary', ''),
-                        'url': article.get('url', ''),
-                        'date': date,
-                        'source': article.get('source', 'Finnhub'),
-                        'sentiment': None,
-                        'sentiment_category': None
-                    })
-                except Exception as e:
-                    print(f"Error processing Finnhub article: {str(e)}")
-                    continue
+            if finnhub_articles and isinstance(finnhub_articles, list):
+                for article in finnhub_articles:
+                    try:
+                        # Ensure we have required fields
+                        if not article.get('headline') or not article.get('url'):
+                            continue
+                            
+                        # Get the date, defaulting to now if not available
+                        date = datetime.now()
+                        if article.get('datetime'):
+                            try:
+                                date = datetime.fromtimestamp(int(article['datetime']))
+                            except:
+                                pass
+                        
+                        all_articles.append({
+                            'title': article['headline'],
+                            'summary': article.get('summary', ''),
+                            'url': article['url'],
+                            'date': date.isoformat(),
+                            'source': article.get('source', 'Finnhub'),
+                            'sentiment': None,
+                            'sentiment_category': None
+                        })
+                    except Exception as e:
+                        print(f"Error processing Finnhub article: {str(e)}")
+                        continue
             
             # Create DataFrame
             df = pd.DataFrame(all_articles)
@@ -86,6 +93,9 @@ class NewsService:
                 
                 # Sort by date
                 df = df.sort_values('date', ascending=False)
+                
+                # Reset index
+                df = df.reset_index(drop=True)
             
             return df
             
@@ -97,19 +107,21 @@ class NewsService:
         """Get recent articles from NewsAPI"""
         try:
             # Get news from the last 7 days
-            end_date = datetime.now().date().isoformat()
-            start_date = (datetime.now() - timedelta(days=7)).date().isoformat()
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=7)
             
             response = self.newsapi.get_everything(
                 q=company_name,
                 language='en',
-                sort_by='publishedAt',  # Sort by date
-                from_param=start_date,
-                to=end_date,
-                page_size=20  # Limit to 20 articles
+                sort_by='publishedAt',
+                from_param=start_date.date().isoformat(),
+                to=end_date.date().isoformat(),
+                page_size=20
             )
             
-            return response.get('articles', [])
+            articles = response.get('articles', [])
+            return articles if articles else []
+            
         except Exception as e:
             print(f"Error fetching NewsAPI articles: {str(e)}")
             return []
@@ -117,15 +129,17 @@ class NewsService:
     def _get_finnhub_articles(self, symbol):
         """Get recent articles from Finnhub"""
         try:
-            end_date = int(datetime.now().timestamp())
-            start_date = int((datetime.now() - timedelta(days=7)).timestamp())
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=7)
             
-            news = self.finnhub_client.company_news(symbol, _from=str(start_date), to=str(end_date))
-            if news:
-                # Sort by datetime (timestamp)
-                news.sort(key=lambda x: x.get('datetime', 0), reverse=True)
-                return news[:20]  # Return top 20 most recent articles
-            return []
+            news = self.finnhub_client.company_news(
+                symbol, 
+                _from=start_date.strftime('%Y-%m-%d'),
+                to=end_date.strftime('%Y-%m-%d')
+            )
+            
+            return news if news else []
+            
         except Exception as e:
             print(f"Error fetching Finnhub news: {str(e)}")
             return []
@@ -150,33 +164,3 @@ class NewsService:
         elif sentiment < -0.1:
             return "Negative"
         return "Neutral"
-    
-    def get_peer_comparison(self, symbol):
-        """Get peer comparison data"""
-        try:
-            # Get peer symbols
-            peers = self.finnhub_client.company_peers(symbol)
-            
-            if not peers:
-                return None
-                
-            # Limit to top 5 peers
-            peers = peers[:5]
-            
-            # Get basic financials for all peers
-            peer_data = []
-            for peer in peers:
-                metrics = self.finnhub_client.company_basic_financials(peer, 'all')
-                if metrics and 'metric' in metrics:
-                    peer_data.append({
-                        'symbol': peer,
-                        'pe_ratio': metrics['metric'].get('peNormalizedAnnual', None),
-                        'price_to_sales': metrics['metric'].get('psAnnual', None),
-                        'price_to_book': metrics['metric'].get('pbAnnual', None),
-                        'debt_to_equity': metrics['metric'].get('totalDebtToEquityQuarterly', None)
-                    })
-            
-            return pd.DataFrame(peer_data)
-        except Exception as e:
-            print(f"Error in peer comparison: {str(e)}")
-            return None
