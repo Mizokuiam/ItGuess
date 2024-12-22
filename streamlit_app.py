@@ -595,22 +595,28 @@ if symbol:
         with tabs[2]:  # News Sentiment Tab
             st.subheader("News Sentiment Analysis")
             
-            # Fetch news data
-            news_data = news_service.get_news(symbol)
-            
-            if news_data and not news_data.empty and len(news_data) > 0:
-                # Display news with sentiment
-                for _, row in news_data.iterrows():
-                    with st.container():
-                        st.markdown(f"""
-                        <div style='padding: 10px; border-left: 4px solid {row['sentiment_color']}; margin: 10px 0;'>
-                            <h4>{row['title']}</h4>
-                            <p>{row['summary']}</p>
-                            <p style='color: #666; font-size: 0.8em;'>{row['date']} • Sentiment: {row['sentiment']}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-            else:
-                st.info("Fetching latest news... Please check back in a few minutes.")
+            with st.spinner("Fetching latest news..."):
+                # Fetch news data
+                news_data = news_service.get_news(symbol)
+                
+                if not news_data.empty:
+                    # Display news with sentiment
+                    for _, row in news_data.iterrows():
+                        with st.container():
+                            st.markdown(f"""
+                            <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
+                                <div style='border-left: 4px solid {row['sentiment_color']}; padding-left: 10px;'>
+                                    <h4 style='margin: 0; color: #333;'>{row['title']}</h4>
+                                    <p style='margin: 10px 0; color: #666;'>{row['summary']}</p>
+                                    <div style='display: flex; justify-content: space-between; color: #888; font-size: 0.9em;'>
+                                        <span>{row['date']}</span>
+                                        <span style='color: {row['sentiment_color']};'>●&nbsp;{row['sentiment']}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.info("No recent news available. Please check back later.")
         
         with tabs[3]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
