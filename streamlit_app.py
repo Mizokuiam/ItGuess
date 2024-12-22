@@ -197,6 +197,16 @@ st.markdown("""
         border-radius: 15px;
         border: 1px solid var(--border-color);
     }
+    
+    /* Hide Streamlit default elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none;}
+    
+    /* Hide any code elements */
+    .element-container:has(pre) {display: none;}
+    pre {display: none !important;}
+    code {display: none !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -376,43 +386,50 @@ with st.sidebar:
 
 # Main content
 if not symbol:  # Show welcome page when no symbol is entered
+    # Hide default elements
+    st.markdown("""
+        <style>
+            .stMarkdown {display: none;}
+            .stMarkdown:first-of-type {display: block;}
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Title and subtitle
     st.markdown('<h1 class="app-title">ItGuess</h1>', unsafe_allow_html=True)
     st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
     
-    # Animated search prompt
+    # Search prompt with typing animation
     st.markdown("""
         <div class="typing-container">
-            <div class="typing-text">
-                Enter a stock symbol to begin (e.g., AAPL for Apple Inc.)
-            </div>
+            <div class="typing-text">Enter a stock symbol to begin (e.g., AAPL for Apple Inc.)</div>
         </div>
     """, unsafe_allow_html=True)
     
     # Feature cards
     st.markdown("""
-        <div class="features-container">
+        <div class="features-container" style="margin-top: 50px;">
             <div class="feature-card">
                 <span class="feature-icon">🎯</span>
-                <div class="feature-title">Technical Analysis</div>
-                <div class="feature-description">
+                <h3 class="feature-title">Technical Analysis</h3>
+                <p class="feature-description">
                     Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.
-                </div>
+                </p>
             </div>
             
             <div class="feature-card">
                 <span class="feature-icon">📈</span>
-                <div class="feature-title">Price Prediction</div>
-                <div class="feature-description">
+                <h3 class="feature-title">Price Prediction</h3>
+                <p class="feature-description">
                     AI-powered price predictions based on technical analysis and market patterns.
-                </div>
+                </p>
             </div>
             
             <div class="feature-card">
                 <span class="feature-icon">📊</span>
-                <div class="feature-title">Live Charts</div>
-                <div class="feature-description">
+                <h3 class="feature-title">Live Charts</h3>
+                <p class="feature-description">
                     Real-time interactive charts with customizable indicators and time periods.
-                </div>
+                </p>
             </div>
         </div>
     """, unsafe_allow_html=True)
