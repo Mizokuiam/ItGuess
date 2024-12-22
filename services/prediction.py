@@ -11,14 +11,26 @@ import time
 
 class PredictionService:
     def __init__(self):
+        """Initialize prediction service"""
         self.models = {}
         self.scalers = {}
-        self.metrics = {}
         self.history = {}
         self.confidence_intervals = {}
         self.feature_importance = {}
         self.features = []
         
+        # Print dependency versions
+        try:
+            import sklearn
+            import yfinance
+            import tensorflow as tf
+            print("\nDependency Versions:")
+            print(f"scikit-learn: {sklearn.__version__}")
+            print(f"yfinance: {yfinance.__version__}")
+            print(f"tensorflow: {tf.__version__}")
+        except Exception as e:
+            print(f"Error checking versions: {e}")
+    
     def _calculate_rsi(self, prices, period=14):
         """Calculate RSI"""
         delta = prices.diff()
@@ -181,6 +193,99 @@ class PredictionService:
             traceback.print_exc()
             return None, None
 
+    def _validate_model(self, symbol):
+        """Validate model and scaler for a symbol"""
+        if symbol not in self.models:
+            print(f"No trained models found for {symbol}")
+            return False
+            
+        if symbol not in self.scalers:
+            print(f"No scaler found for {symbol}")
+            return False
+            
+        if not hasattr(self, 'features') or not self.features:
+            print("Feature list not initialized")
+            return False
+            
+        print("\nModel Validation:")
+        print(f"Models available: {list(self.models[symbol].keys())}")
+        print(f"Features required: {self.features}")
+        print(f"Scaler available: {type(self.scalers[symbol]).__name__}")
+        
+        return True
+    
+    def _validate_data(self, df, symbol, purpose=""):
+        """Validate dataframe for training or prediction"""
+        print(f"\nValidating data for {purpose}...")
+        
+        if df is None or df.empty:
+            print("No data available")
+            return False
+            
+        print(f"Data shape: {df.shape}")
+        print("\nNull values:")
+        null_counts = df.isnull().sum()
+        print(null_counts[null_counts > 0])
+        
+        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+            
+        print("\nData sample:")
+        print(df.head())
+        
+        return True
+    
+    def _validate_features(self, features_df, expected_features):
+        """Validate features for prediction"""
+        print("\nValidating features...")
+        
+        missing_features = [f for f in expected_features if f not in features_df.columns]
+        if missing_features:
+            print(f"Missing features: {missing_features}")
+            return False
+            
+        print("\nFeature statistics:")
+        stats = features_df[expected_features].describe()
+        print(stats)
+        
+        # Check for infinite values
+        inf_mask = np.isinf(features_df[expected_features])
+        inf_counts = inf_mask.sum()
+        if inf_counts.any():
+            print("\nInfinite values found:")
+            print(inf_counts[inf_counts > 0])
+            return False
+            
+        return True
+    
+    def _validate_predictions(self, predictions, current_price):
+        """Validate prediction outputs"""
+        print("\nValidating predictions...")
+        
+        if not predictions:
+            print("No predictions generated")
+            return False
+            
+        for model_name, pred in predictions.items():
+            print(f"\n{model_name} prediction:")
+            print(f"Current price: {current_price:.2f}")
+            print(f"Predicted price: {pred:.2f}")
+            print(f"Predicted change: {((pred/current_price - 1) * 100):.2f}%")
+            
+            # Check for unreasonable predictions
+            if pred <= 0 or pred > current_price * 2:
+                print(f"Warning: Prediction seems unreasonable")
+                return False
+                
+            if not np.isfinite(pred):
+                print(f"Warning: Invalid prediction value")
+                return False
+                
+        return True
+
     def train_models(self, symbol):
         """Train prediction models"""
         try:
@@ -277,70 +382,72 @@ class PredictionService:
     def predict(self, symbol, period='1d'):
         """Make predictions with confidence intervals"""
         try:
-            print(f"\nStarting prediction for {symbol}...")
+            print(f"\n{'='*50}")
+            print(f"Starting prediction for {symbol}")
+            print(f"{'='*50}")
             
-            if symbol not in self.models:
-                print(f"No trained models found for {symbol}")
+            # Validate model and dependencies
+            if not self._validate_model(symbol):
                 return None
-            
-            if symbol not in self.scalers:
-                print(f"No scaler found for {symbol}")
-                return None
-            
-            if not hasattr(self, 'features') or not self.features:
-                print("Feature list not initialized")
-                return None
-            
-            print(f"Models available: {list(self.models[symbol].keys())}")
-            print(f"Features required: {self.features}")
             
             # Get latest data
             print("\nFetching latest data...")
             stock = yf.Ticker(symbol)
             df = stock.history(period="60d")
-            print(f"Fetched {len(df)} days of data")
             
-            if df.empty:
-                print(f"No historical data available for {symbol}")
+            # Validate raw data
+            if not self._validate_data(df, symbol, "prediction"):
                 return None
             
             # Calculate features with validation
             print("\nCalculating prediction features...")
             try:
+                feature_data = {}
+                
                 # Basic features
-                df['Returns'] = df['Close'].pct_change()
-                df['Volume_Change'] = df['Volume'].pct_change()
-                df['Price_Range'] = (df['High'] - df['Low']) / df['Close']
+                feature_data['Returns'] = df['Close'].pct_change()
+                feature_data['Volume_Change'] = df['Volume'].pct_change()
+                feature_data['Price_Range'] = (df['High'] - df['Low']) / df['Close']
                 
                 # Technical indicators
-                df['RSI'] = self._calculate_rsi(df['Close'])
-                df['Momentum'] = self._calculate_momentum(df['Close'])
-                df['BB_Width'] = self._calculate_bollinger_bands(df['Close'])
-                df['MACD_Hist'] = self._calculate_macd(df['Close'])
+                feature_data['RSI'] = self._calculate_rsi(df['Close'])
+                feature_data['Momentum'] = self._calculate_momentum(df['Close'])
+                feature_data['BB_Width'] = self._calculate_bollinger_bands(df['Close'])
+                feature_data['MACD_Hist'] = self._calculate_macd(df['Close'])
                 
                 # Moving averages
-                df['MA5'] = df['Close'].rolling(window=5).mean()
-                df['MA20'] = df['Close'].rolling(window=20).mean()
-                df['MA50'] = df['Close'].rolling(window=50).mean()
-                df['Trend_5_20'] = df['MA5'] - df['MA20']
-                df['Trend_20_50'] = df['MA20'] - df['MA50']
+                feature_data['MA5'] = df['Close'].rolling(window=5).mean()
+                feature_data['MA20'] = df['Close'].rolling(window=20).mean()
+                feature_data['MA50'] = df['Close'].rolling(window=50).mean()
+                feature_data['Trend_5_20'] = feature_data['MA5'] - feature_data['MA20']
+                feature_data['Trend_20_50'] = feature_data['MA20'] - feature_data['MA50']
                 
                 # Volume
-                df['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
-                df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
-                df['Volume_Trend'] = df['Volume_MA5'] - df['Volume_MA20']
+                feature_data['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
+                feature_data['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
+                feature_data['Volume_Trend'] = feature_data['Volume_MA5'] - feature_data['Volume_MA20']
                 
                 # Volatility
-                df['Volatility'] = df['Returns'].rolling(window=20).std()
-                df['Volatility_Change'] = df['Volatility'].pct_change()
+                feature_data['Volatility'] = feature_data['Returns'].rolling(window=20).std()
+                feature_data['Volatility_Change'] = feature_data['Volatility'].pct_change()
                 
                 # Patterns
-                df['Higher_Highs'] = (df['High'] > df['High'].shift(1)).astype(int)
-                df['Lower_Lows'] = (df['Low'] < df['Low'].shift(1)).astype(int)
-                df['Price_Trend'] = df['Higher_Highs'] - df['Lower_Lows']
+                feature_data['Higher_Highs'] = (df['High'] > df['High'].shift(1)).astype(int)
+                feature_data['Lower_Lows'] = (df['Low'] < df['Low'].shift(1)).astype(int)
+                feature_data['Price_Trend'] = feature_data['Higher_Highs'] - feature_data['Lower_Lows']
+                
+                # Add features to dataframe
+                for name, data in feature_data.items():
+                    df[name] = data
                 
             except Exception as e:
                 print(f"Error calculating features: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
+            
+            # Validate features
+            if not self._validate_features(df, self.features):
                 return None
             
             # Drop rows with missing values
@@ -356,46 +463,54 @@ class PredictionService:
             
             # Get the last row
             last_row = df.iloc[-1:]
-            print("\nFeature values for prediction:")
-            for feature in self.features:
-                print(f"{feature}: {last_row[feature].values[0]:.4f}")
+            current_price = float(last_row['Close'].values[0])
             
             # Prepare features
             try:
+                print("\nPreparing input for prediction...")
                 X = last_row[self.features].values
-                print("\nInput shape:", X.shape)
+                print(f"Input shape before reshape: {X.shape}")
+                
+                # Ensure 2D array
+                if len(X.shape) == 1:
+                    X = X.reshape(1, -1)
+                print(f"Input shape after reshape: {X.shape}")
                 
                 # Scale features
                 scaler = self.scalers[symbol]
                 X_scaled = scaler.transform(X)
                 print("Scaled shape:", X_scaled.shape)
-                print("Scaled values:", X_scaled[0])
+                
+                # Verify scaled values
+                print("\nScaled feature values:")
+                for i, feature in enumerate(self.features):
+                    print(f"{feature}: {X_scaled[0, i]:.4f}")
                 
             except Exception as e:
                 print(f"Error preparing features: {e}")
+                import traceback
+                traceback.print_exc()
                 return None
             
             predictions = {}
             confidence_intervals = {}
             
-            current_price = float(last_row['Close'].values[0])
-            print(f"\nCurrent price: {current_price:.2f}")
-            
             # Make predictions
             for model_name, model in self.models[symbol].items():
                 try:
                     print(f"\nPredicting with {model_name}...")
+                    print(f"Model type: {type(model).__name__}")
                     
                     if model_name == 'rf':
                         # Random Forest prediction
                         tree_preds = []
-                        for tree in model.estimators_:
+                        for i, tree in enumerate(model.estimators_):
                             try:
                                 pred = tree.predict(X_scaled)[0]
-                                if not np.isnan(pred):
+                                if np.isfinite(pred):
                                     tree_preds.append(pred)
                             except Exception as e:
-                                print(f"Tree prediction failed: {e}")
+                                print(f"Tree {i} prediction failed: {e}")
                                 continue
                         
                         if not tree_preds:
@@ -403,6 +518,7 @@ class PredictionService:
                             continue
                             
                         return_pred = np.mean(tree_preds)
+                        print(f"Number of valid tree predictions: {len(tree_preds)}")
                         print(f"Return prediction: {return_pred:.4f}")
                         
                         if len(tree_preds) > 1:
@@ -414,13 +530,13 @@ class PredictionService:
                     else:  # Neural Network
                         # Multiple predictions for uncertainty
                         nn_preds = []
-                        for _ in range(100):
+                        for i in range(100):
                             try:
                                 pred = model.predict(X_scaled, verbose=0)[0][0]
-                                if not np.isnan(pred):
+                                if np.isfinite(pred):
                                     nn_preds.append(pred)
                             except Exception as e:
-                                print(f"NN prediction failed: {e}")
+                                print(f"NN prediction {i} failed: {e}")
                                 continue
                         
                         if not nn_preds:
@@ -428,6 +544,7 @@ class PredictionService:
                             continue
                             
                         return_pred = np.mean(nn_preds)
+                        print(f"Number of valid NN predictions: {len(nn_preds)}")
                         print(f"Return prediction: {return_pred:.4f}")
                         
                         if len(nn_preds) > 1:
@@ -440,21 +557,21 @@ class PredictionService:
                     pred_price = current_price * (1 + return_pred)
                     ci_prices = (current_price * (1 + return_ci[0]), current_price * (1 + return_ci[1]))
                     
-                    print(f"Price prediction: {pred_price:.2f}")
-                    print(f"Confidence interval: ({ci_prices[0]:.2f}, {ci_prices[1]:.2f})")
-                    
                     predictions[model_name] = float(pred_price)
                     confidence_intervals[model_name] = (float(ci_prices[0]), float(ci_prices[1]))
                     
                 except Exception as e:
                     print(f"Error in {model_name} prediction: {e}")
+                    import traceback
+                    traceback.print_exc()
                     continue
             
-            if not predictions:
-                print("No successful predictions made")
+            # Validate predictions
+            if not self._validate_predictions(predictions, current_price):
                 return None
             
-            print("\nFinal predictions:", predictions)
+            print("\nPredictions completed successfully")
+            print("Final predictions:", predictions)
             print("Confidence intervals:", confidence_intervals)
             
             self.confidence_intervals[symbol] = confidence_intervals
