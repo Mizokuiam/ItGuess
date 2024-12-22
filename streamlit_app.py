@@ -339,50 +339,20 @@ if technical_analysis is None or prediction_service is None:
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
+    st.markdown("# ItGuess")
+    st.markdown("Smart Stock Analysis & Prediction")
     
-    # Features Description
-    st.markdown("""
-    <div class='feature-box'>
-        <div class='feature-title'>🎯 Technical Analysis</div>
-        <div class='feature-desc'>Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.</div>
-    </div>
+    # Theme selector
+    theme = st.selectbox('Choose Theme', ['Light', 'Dark'], key='theme_selector')
+    if theme:
+        st.markdown(f"""
+            <script>
+                document.querySelector('body').setAttribute('data-theme', '{theme.lower()}');
+            </script>
+        """, unsafe_allow_html=True)
     
-    <div class='feature-box'>
-        <div class='feature-title'>📈 Price Prediction</div>
-        <div class='feature-desc'>AI-powered price predictions based on technical analysis and market patterns.</div>
-    </div>
-    
-    <div class='feature-box'>
-        <div class='feature-title'>📊 Live Charts</div>
-        <div class='feature-desc'>Real-time interactive charts with customizable indicators and time periods.</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Search box with improved styling
-    st.markdown("<div class='search-container'>", unsafe_allow_html=True)
-    symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Analysis settings
-    with st.expander("Analysis Settings", expanded=True):
-        st.subheader("Technical Analysis Settings")
-        rsi_period = st.slider("RSI Period", 
-                             min_value=1, max_value=21, value=14,
-                             help="Relative Strength Index calculation period")
-        
-        ma_period = st.slider("Moving Average Period",
-                            min_value=1, max_value=50, value=20,
-                            help="Moving Average calculation period")
-    
-    # Auto-refresh settings
-    with st.expander("Refresh Settings"):
-        auto_refresh = st.checkbox("Auto-refresh data (5min)",
-                                 help="Automatically refresh data every 5 minutes")
-        if auto_refresh and (datetime.now() - st.session_state.last_update).seconds > 300:
-            st.session_state.last_update = datetime.now()
-            st.rerun()
+    # Stock input
+    symbol = st.text_input('Enter Stock Symbol:', key='stock_input').upper()
 
 # Main content
 if not symbol:  # Show welcome page when no symbol is entered
@@ -391,6 +361,15 @@ if not symbol:  # Show welcome page when no symbol is entered
         <style>
             .stMarkdown {display: none;}
             .stMarkdown:first-of-type {display: block;}
+            
+            /* Sidebar styling */
+            .css-1d391kg {
+                padding-top: 1rem;
+            }
+            
+            .css-1d391kg h1 {
+                margin-bottom: 0.5rem;
+            }
         </style>
     """, unsafe_allow_html=True)
     
