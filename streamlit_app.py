@@ -400,122 +400,70 @@ if symbol:
                 # Quick Stats in first row
                 st.subheader("Quick Stats")
                 try:
-                    stock = yf.Ticker(symbol)
-                    info = stock.info
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        market_cap = info.get('marketCap', 0)
-                        market_cap_str = f"${market_cap/1e9:.2f}B" if market_cap >= 1e9 else f"${market_cap/1e6:.2f}M"
-                        st.metric("Market Cap", market_cap_str)
-                    
-                    with col2:
-                        pe_ratio = info.get('trailingPE', 'N/A')
-                        pe_ratio = f"{pe_ratio:.2f}" if isinstance(pe_ratio, (int, float)) else pe_ratio
-                        st.metric("P/E Ratio", pe_ratio)
-                    
-                    with col3:
-                        high_52w = info.get('fiftyTwoWeekHigh', 0)
-                        low_52w = info.get('fiftyTwoWeekLow', 0)
-                        if high_52w and low_52w:
-                            range_52w = f"${low_52w:.2f} - ${high_52w:.2f}"
-                        else:
-                            range_52w = "N/A"
-                        st.metric("52W Range", range_52w)
-                    
-                    with col4:
-                        volume = info.get('volume', 0)
-                        volume_str = f"{volume/1e6:.1f}M" if volume >= 1e6 else f"{volume/1e3:.1f}K"
-                        st.metric("Volume", volume_str)
-                
-                except Exception as e:
-                    st.error(f"Error loading stock information: {str(e)}")
-
-                # Second row: Price Movement and Peer Comparison
-                col1, col2 = st.columns([3, 2])
-                
-                with col1:
-                    st.subheader("Price Movement")
-                    try:
-                        hist = stock.history(period="6mo")
-                        fig = go.Figure(data=[
-                            go.Candlestick(
-                                x=hist.index,
-                                open=hist['Open'],
-                                high=hist['High'],
-                                low=hist['Low'],
-                                close=hist['Close'],
-                                name='Price'
+                    if info is not None:
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            current_price = stock.history(period='1d')['Close'].iloc[-1]
+                            st.metric(
+                                "Current Price",
+                                f"${current_price:.2f}",
+                                f"{price_change_percentage:.2f}%" if 'price_change_percentage' in locals() else None
                             )
-                        ])
-                        
-                        fig.update_layout(
-                            title=f"{symbol} 6-Month Price Movement",
-                            yaxis_title="Price",
-                            xaxis_title="Date",
-                            height=400,
-                            template='plotly_white'
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                    except Exception as e:
-                        st.error(f"Error creating price movement chart: {str(e)}")
-                
-                with col2:
-                    st.subheader("Peer Comparison")
-                    try:
-                        # Get peer symbols from yfinance
-                        info = stock.info
-                        peers = info.get('recommendationKey', [])
-                        if peers:
-                            peer_data = pd.DataFrame()
-                            for peer in peers[:5]:  # Limit to 5 peers
-                                try:
-                                    peer_stock = yf.Ticker(peer)
-                                    peer_info = peer_stock.info
-                                    peer_data = peer_data.append({
-                                        'symbol': peer,
-                                        'pe_ratio': peer_info.get('trailingPE', 0),
-                                        'price_to_sales': peer_info.get('priceToSalesTrailing12Months', 0),
-                                        'price_to_book': peer_info.get('priceToBook', 0),
-                                        'debt_to_equity': peer_info.get('debtToEquity', 0)
-                                    }, ignore_index=True)
-                                except:
-                                    continue
                             
-                            if not peer_data.empty:
-                                # Create radar chart for peer comparison
-                                metrics = ['pe_ratio', 'price_to_sales', 'price_to_book', 'debt_to_equity']
-                                fig = go.Figure()
-                                
-                                for idx, row in peer_data.iterrows():
-                                    fig.add_trace(go.Scatterpolar(
-                                        r=[row[m] for m in metrics],
-                                        theta=metrics,
-                                        fill='toself',
-                                        name=row['symbol']
-                                    ))
-                                    
-                                fig.update_layout(
-                                    polar=dict(
-                                        radialaxis=dict(
-                                            visible=True,
-                                            range=[0, peer_data[metrics].max().max()]
-                                        )),
-                                    showlegend=True,
-                                    height=400
-                                )
-                                
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.info("Peer comparison data not available")
-                        else:
-                            st.info("No peer data available")
-                    except Exception as e:
-                        st.info("Peer comparison data not available")
+                        with col2:
+                            market_cap = info.get('marketCap', 0)
+                            st.metric(
+                                "Market Cap",
+                                f"${market_cap/1e9:.2f}B" if market_cap else "N/A"
+                            )
+                            
+                        with col3:
+                            volume = info.get('volume', 0)
+                            avg_volume = info.get('averageVolume', 0)
+                            volume_change = ((volume - avg_volume) / avg_volume * 100) if avg_volume else 0
+                            st.metric(
+                                "Volume",
+                                f"{volume:,}",
+                                f"{volume_change:.1f}%" if volume_change else None
+                            )
+                except Exception as e:
+                    st.error(f"Error displaying quick stats: {str(e)}")
+                
+                # Second row: Key Statistics
+                st.subheader("Key Statistics")
+                try:
+                    if info is not None:
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.metric("P/E Ratio", f"{info.get('trailingPE', 'N/A'):.2f}" if info.get('trailingPE') else "N/A")
+                            st.metric("Beta", f"{info.get('beta', 'N/A'):.2f}" if info.get('beta') else "N/A")
+                            
+                        with col2:
+                            st.metric("52 Week High", f"${info.get('fiftyTwoWeekHigh', 'N/A'):.2f}" if info.get('fiftyTwoWeekHigh') else "N/A")
+                            st.metric("52 Week Low", f"${info.get('fiftyTwoWeekLow', 'N/A'):.2f}" if info.get('fiftyTwoWeekLow') else "N/A")
+                            
+                        with col3:
+                            dividend_yield = info.get('dividendYield', 0)
+                            st.metric("Dividend Yield", f"{dividend_yield*100:.2f}%" if dividend_yield else "N/A")
+                            st.metric("Profit Margin", f"{info.get('profitMargins', 0)*100:.2f}%" if info.get('profitMargins') else "N/A")
+                except Exception as e:
+                    st.error(f"Error displaying key statistics: {str(e)}")
 
+                # Third row: Peer Comparison
+                st.subheader("Peer Comparison")
+                try:
+                    if info is not None and 'recommendationKey' in info:
+                        peers = stock.get_info().get('recommendationKey', 'N/A')
+                        if peers != 'N/A':
+                            st.write(f"Analyst Recommendation: {peers.title()}")
+                except Exception as e:
+                    st.info("Peer comparison data not available")
+                    
+            except Exception as e:
+                st.error(f"Error in Overview tab: {str(e)}")
+        
         with tabs[1]:  # Technical Analysis Tab
             with st.spinner("Calculating technical indicators..."):
                 # Get technical analysis data
