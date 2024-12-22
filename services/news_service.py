@@ -19,20 +19,29 @@ class NewsService:
             newsapi_articles = self._get_newsapi_articles(company_name)
             for article in newsapi_articles:
                 try:
+                    # Handle publishedAt date
                     published_at = article.get('publishedAt')
-                    if published_at is None:
-                        published_at = datetime.now().isoformat()
-                    elif isinstance(published_at, datetime):
-                        published_at = published_at.isoformat()
+                    try:
+                        if published_at:
+                            if isinstance(published_at, str):
+                                date = pd.to_datetime(published_at).isoformat()
+                            elif isinstance(published_at, datetime):
+                                date = published_at.isoformat()
+                            else:
+                                date = datetime.now().isoformat()
+                        else:
+                            date = datetime.now().isoformat()
+                    except Exception:
+                        date = datetime.now().isoformat()
                     
                     all_articles.append({
                         'title': article.get('title', ''),
                         'summary': article.get('description', ''),
                         'url': article.get('url', ''),
-                        'date': published_at,
+                        'date': date,
                         'source': article.get('source', {}).get('name', 'NewsAPI'),
-                        'sentiment': None,  # Will be calculated later
-                        'sentiment_category': None  # Will be calculated later
+                        'sentiment': None,
+                        'sentiment_category': None
                     })
                 except Exception as e:
                     print(f"Error processing NewsAPI article: {str(e)}")
@@ -42,8 +51,20 @@ class NewsService:
             finnhub_articles = self._get_finnhub_articles(symbol)
             for article in finnhub_articles:
                 try:
+                    # Handle Finnhub timestamp
                     timestamp = article.get('datetime', 0)
-                    date = datetime.fromtimestamp(timestamp).isoformat() if timestamp else datetime.now().isoformat()
+                    try:
+                        if timestamp:
+                            if isinstance(timestamp, (int, float)):
+                                date = datetime.fromtimestamp(timestamp).isoformat()
+                            elif isinstance(timestamp, str):
+                                date = pd.to_datetime(timestamp).isoformat()
+                            else:
+                                date = datetime.now().isoformat()
+                        else:
+                            date = datetime.now().isoformat()
+                    except Exception:
+                        date = datetime.now().isoformat()
                     
                     all_articles.append({
                         'title': article.get('headline', ''),
@@ -51,8 +72,8 @@ class NewsService:
                         'url': article.get('url', ''),
                         'date': date,
                         'source': article.get('source', 'Finnhub'),
-                        'sentiment': None,  # Will be calculated later
-                        'sentiment_category': None  # Will be calculated later
+                        'sentiment': None,
+                        'sentiment_category': None
                     })
                 except Exception as e:
                     print(f"Error processing Finnhub article: {str(e)}")
