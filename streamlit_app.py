@@ -621,8 +621,11 @@ if symbol:
             
             with st.spinner("Calculating price predictions..."):
                 try:
+                    # Train models first
+                    prediction_service.train_models(symbol)
+                    
                     # Get prediction data
-                    prediction_data = prediction_service.predict_price(symbol)
+                    prediction_data = prediction_service.predict(symbol)
                     
                     if prediction_data:
                         col1, col2 = st.columns([2, 1])
@@ -647,15 +650,16 @@ if symbol:
                                 line=dict(color='red', dash='dash')
                             ))
                             
-                            # Add confidence intervals
-                            fig.add_trace(go.Scatter(
-                                x=prediction_data['dates'] + prediction_data['dates'][::-1],
-                                y=prediction_data['upper_bound'] + prediction_data['lower_bound'][::-1],
-                                fill='toself',
-                                fillcolor='rgba(255,0,0,0.1)',
-                                line=dict(color='rgba(255,0,0,0)'),
-                                name='95% Confidence Interval'
-                            ))
+                            # Add confidence intervals if available
+                            if 'upper_bound' in prediction_data and 'lower_bound' in prediction_data:
+                                fig.add_trace(go.Scatter(
+                                    x=prediction_data['dates'] + prediction_data['dates'][::-1],
+                                    y=prediction_data['upper_bound'] + prediction_data['lower_bound'][::-1],
+                                    fill='toself',
+                                    fillcolor='rgba(255,0,0,0.1)',
+                                    line=dict(color='rgba(255,0,0,0)'),
+                                    name='95% Confidence Interval'
+                                ))
                             
                             fig.update_layout(
                                 title=f"{symbol} Price Prediction",
@@ -671,9 +675,10 @@ if symbol:
                             # Display prediction metrics
                             st.markdown("### Prediction Metrics")
                             
-                            accuracy = prediction_data['accuracy']
-                            mse = prediction_data['mse']
-                            r2 = prediction_data['r2']
+                            metrics = prediction_data.get('metrics', {})
+                            accuracy = metrics.get('accuracy', 0)
+                            mse = metrics.get('mse', 0)
+                            r2 = metrics.get('r2', 0)
                             
                             st.metric("Model Accuracy", f"{accuracy:.1f}%")
                             st.metric("Mean Squared Error", f"{mse:.4f}")
@@ -681,23 +686,26 @@ if symbol:
                             
                             # Feature importance
                             st.markdown("### Feature Importance")
-                            for feature, importance in prediction_data['feature_importance'].items():
+                            feature_importance = prediction_data.get('feature_importance', {})
+                            for feature, importance in feature_importance.items():
                                 st.metric(feature, f"{importance:.2f}%")
                             
                             # Next day prediction
                             st.markdown("### Next Day Prediction")
-                            next_day_price = prediction_data['next_day_prediction']
-                            current_price = prediction_data['actual_prices'][-1]
-                            price_change = ((next_day_price - current_price) / current_price) * 100
-                            
-                            price_color = "green" if price_change > 0 else "red"
-                            st.markdown(f"""
-                            <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
-                                <h3 style='margin: 0;'>Predicted Price</h3>
-                                <h2 style='color: {price_color}; margin: 10px 0;'>${next_day_price:.2f}</h2>
-                                <p style='color: {price_color}; margin: 0;'>{price_change:+.2f}%</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            next_day = prediction_data.get('next_day_prediction', {})
+                            if next_day:
+                                next_price = next_day.get('price', 0)
+                                current_price = prediction_data['actual_prices'][-1]
+                                price_change = ((next_price - current_price) / current_price) * 100
+                                
+                                price_color = "green" if price_change > 0 else "red"
+                                st.markdown(f"""
+                                <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+                                    <h3 style='margin: 0;'>Predicted Price</h3>
+                                    <h2 style='color: {price_color}; margin: 10px 0;'>${next_price:.2f}</h2>
+                                    <p style='color: {price_color}; margin: 0;'>{price_change:+.2f}%</p>
+                                </div>
+                                """, unsafe_allow_html=True)
                     else:
                         st.error("Unable to generate predictions. Please try again later.")
                         
