@@ -4,8 +4,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from services.technical_analysis import TechnicalAnalysisService
-from services.prediction import PredictionService
 from plotly.subplots import make_subplots
 import requests
 from PIL import Image
@@ -549,5 +547,379 @@ elif symbol:  # Show stock analysis when symbol is entered
                         <p style='color: #666;'>↑ {buy_signals} Buy vs ↓ {sell_signals} Sell signals</p>
                     </div>
                     """, unsafe_allow_html=True)
+
+        with tabs[2]:  # Price Prediction Tab
+            st.subheader("Price Prediction Analysis")
+            
+            with st.spinner("Calculating price predictions..."):
+                try:
+                    # Train models first
+                    prediction_service.train_models(symbol)
+                    
+                    # Get prediction data
+                    prediction_data = prediction_service.predict(symbol)
+                    
+                    if prediction_data:
+                        # Plot predicted vs actual prices
+                        fig = go.Figure()
+                        
+                        # Add actual prices
+                        fig.add_trace(go.Scatter(
+                            x=prediction_data['dates'],
+                            y=prediction_data['actual_prices'],
+                            name='Actual Price',
+                            line=dict(color='blue')
+                        ))
+                        
+                        # Add predicted prices
+                        fig.add_trace(go.Scatter(
+                            x=prediction_data['dates'],
+                            y=prediction_data['predicted_prices'],
+                            name='Predicted Price',
+                            line=dict(color='red', dash='dash')
+                        ))
+                        
+                        # Add confidence intervals if available
+                        if 'upper_bound' in prediction_data and 'lower_bound' in prediction_data:
+                            fig.add_trace(go.Scatter(
+                                x=prediction_data['dates'] + prediction_data['dates'][::-1],
+                                y=prediction_data['upper_bound'] + prediction_data['lower_bound'][::-1],
+                                fill='toself',
+                                fillcolor='rgba(255,0,0,0.1)',
+                                line=dict(color='rgba(255,0,0,0)'),
+                                name='95% Confidence Interval'
+                            ))
+                        
+                        fig.update_layout(
+                            title=f"{symbol} Price Prediction",
+                            xaxis_title="Date",
+                            yaxis_title="Price",
+                            template='plotly_white',
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Display metrics and predictions in columns
+                        col1, col2 = st.columns([1, 1])
+                        
+                        with col1:
+                            # Display prediction metrics
+                            st.markdown("### Prediction Metrics")
+                            
+                            metrics = prediction_data.get('metrics', {})
+                            accuracy = metrics.get('accuracy', 0)
+                            mse = metrics.get('mse', 0)
+                            r2 = metrics.get('r2', 0)
+                            
+                            st.metric("Model Accuracy", f"{accuracy:.1f}%")
+                            st.metric("Mean Squared Error", f"{mse:.4f}")
+                            st.metric("R² Score", f"{r2:.4f}")
+                            
+                            # Feature importance
+                            st.markdown("### Feature Importance")
+                            feature_importance = prediction_data.get('feature_importance', {})
+                            for feature, importance in feature_importance.items():
+                                st.metric(feature, f"{importance:.2f}%")
+                        
+                        with col2:
+                            # Future predictions
+                            st.markdown("### Future Price Predictions")
+                            future_predictions = prediction_data.get('future_predictions', {})
+                            
+                            current_price = prediction_data['actual_prices'][-1]
+                            
+                            periods = {
+                                '1_day': 'Next Day',
+                                '3_days': 'Next 3 Days',
+                                '1_week': 'Next Week',
+                                '2_weeks': 'Next 2 Weeks',
+                                '1_month': 'Next Month'
+                            }
+                            
+                            for key, label in periods.items():
+                                if key in future_predictions:
+                                    pred = future_predictions[key]
+                                    price = pred['price']
+                                    confidence = pred['confidence']
+                                    change = ((price - current_price) / current_price) * 100
+                                    
+                                    price_color = "green" if change > 0 else "red"
+                                    st.markdown(f"""
+                                    <div style='padding: 10px; background: white; border-radius: 5px; margin: 5px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'>
+                                        <div style='display: flex; justify-content: space-between; align-items: center;'>
+                                            <span style='font-weight: bold;'>{label}</span>
+                                            <span style='color: {price_color};'>${price:.2f} ({change:+.1f}%)</span>
+                                        </div>
+                                        <div style='color: #666; font-size: 0.8em;'>Confidence: {confidence*100:.1f}%</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                    else:
+                        st.error("Unable to generate predictions. Please try again later.")
+                        
+                except Exception as e:
+                    st.error(f"Error in price prediction: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+
+        with tabs[3]:  # Live Chart Tab
+            st.subheader("Live Chart Analysis")
+            
+            # Time period selection
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                period_options = {
+                    '1D': '1d',
+                    '5D': '5d',
+                    '1M': '1mo',
+                    '3M': '3mo',
+                    '6M': '6mo',
+                    '1Y': '1y',
+                    '2Y': '2y',
+                    'YTD': 'ytd'
+                }
+                selected_period = st.select_slider(
+                    "Select Time Period",
+                    options=list(period_options.keys()),
+                    value='3M'
+                )
+                period = period_options[selected_period]
+            
+            with col2:
+                interval_options = {
+                    '1 Minute': '1m',
+                    '5 Minutes': '5m',
+                    '15 Minutes': '15m',
+                    '30 Minutes': '30m',
+                    '1 Hour': '1h',
+                    'Daily': '1d',
+                    'Weekly': '1wk',
+                    'Monthly': '1mo'
+                }
+                selected_interval = st.selectbox(
+                    "Select Interval",
+                    options=list(interval_options.keys()),
+                    index=5  # Default to Daily
+                )
+                interval = interval_options[selected_interval]
+            
+            with col3:
+                # Theme toggle for the chart
+                chart_theme = st.selectbox(
+                    "Chart Theme",
+                    options=['Light', 'Dark'],
+                    index=0
+                )
+            
+            # Get stock data
+            with st.spinner("Loading chart data..."):
+                try:
+                    stock = yf.Ticker(symbol)
+                    data = stock.history(period=period, interval=interval)
+                    
+                    if not data.empty:
+                        # Technical indicators selection
+                        st.markdown("### Technical Indicators")
+                        indicator_cols = st.columns(4)
+                        
+                        with indicator_cols[0]:
+                            show_ma = st.checkbox("Moving Averages", value=True)
+                            if show_ma:
+                                ma_periods = st.multiselect(
+                                    "MA Periods",
+                                    options=[5, 10, 20, 50, 100, 200],
+                                    default=[20, 50]
+                                )
+                        
+                        with indicator_cols[1]:
+                            show_bb = st.checkbox("Bollinger Bands")
+                            if show_bb:
+                                bb_period = st.number_input("BB Period", value=20, min_value=5, max_value=50)
+                                bb_std = st.number_input("BB Std Dev", value=2, min_value=1, max_value=4)
+                        
+                        with indicator_cols[2]:
+                            show_rsi = st.checkbox("RSI")
+                            if show_rsi:
+                                rsi_period = st.number_input("RSI Period", value=14, min_value=5, max_value=30)
+                        
+                        with indicator_cols[3]:
+                            show_volume = st.checkbox("Volume", value=True)
+                        
+                        # Create the main chart
+                        fig = make_subplots(
+                            rows=2 if show_volume else 1,
+                            cols=1,
+                            shared_xaxes=True,
+                            vertical_spacing=0.05,
+                            row_heights=[0.7, 0.3] if show_volume else [1]
+                        )
+                        
+                        # Add candlestick chart
+                        fig.add_trace(
+                            go.Candlestick(
+                                x=data.index,
+                                open=data['Open'],
+                                high=data['High'],
+                                low=data['Low'],
+                                close=data['Close'],
+                                name='Price'
+                            ),
+                            row=1, col=1
+                        )
+                        
+                        # Add Moving Averages
+                        if show_ma:
+                            for period in ma_periods:
+                                ma = data['Close'].rolling(window=period).mean()
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=data.index,
+                                        y=ma,
+                                        name=f'MA{period}',
+                                        line=dict(width=1)
+                                    ),
+                                    row=1, col=1
+                                )
+                        
+                        # Add Bollinger Bands
+                        if show_bb:
+                            bb_ma = data['Close'].rolling(window=bb_period).mean()
+                            bb_std = data['Close'].rolling(window=bb_period).std()
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=data.index,
+                                    y=bb_ma + (bb_std * 2),
+                                    name='BB Upper',
+                                    line=dict(dash='dash', width=1)
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=data.index,
+                                    y=bb_ma - (bb_std * 2),
+                                    name='BB Lower',
+                                    line=dict(dash='dash', width=1),
+                                    fill='tonexty'
+                                ),
+                                row=1, col=1
+                            )
+                        
+                        # Add RSI
+                        if show_rsi:
+                            delta = data['Close'].diff()
+                            gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
+                            loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
+                            rs = gain / loss
+                            rsi = 100 - (100 / (1 + rs))
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=data.index,
+                                    y=rsi,
+                                    name='RSI',
+                                    line=dict(color='purple')
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            # Add RSI reference lines
+                            fig.add_hline(y=70, line_dash="dash", line_color="red", row=1)
+                            fig.add_hline(y=30, line_dash="dash", line_color="green", row=1)
+                        
+                        # Add Volume
+                        if show_volume:
+                            colors = ['red' if close < open else 'green'
+                                    for close, open in zip(data['Close'], data['Open'])]
+                            
+                            fig.add_trace(
+                                go.Bar(
+                                    x=data.index,
+                                    y=data['Volume'],
+                                    name='Volume',
+                                    marker_color=colors
+                                ),
+                                row=2, col=1
+                            )
+                        
+                        # Update layout
+                        fig.update_layout(
+                            title=f"{symbol} Live Chart",
+                            xaxis_title="Date",
+                            yaxis_title="Price",
+                            height=800,
+                            template='plotly_white' if chart_theme == 'Light' else 'plotly_dark',
+                            showlegend=True,
+                            legend=dict(
+                                yanchor="top",
+                                y=0.99,
+                                xanchor="left",
+                                x=0.01
+                            ),
+                            margin=dict(l=0, r=0, t=30, b=0)
+                        )
+                        
+                        # Add range slider
+                        fig.update_xaxes(rangeslider_visible=True)
+                        
+                        # Add drawing tools
+                        config = {
+                            'modeBarButtonsToAdd': [
+                                'drawline',
+                                'drawopenpath',
+                                'drawclosedpath',
+                                'drawcircle',
+                                'drawrect',
+                                'eraseshape'
+                            ]
+                        }
+                        
+                        # Display the chart
+                        st.plotly_chart(fig, use_container_width=True, config=config)
+                        
+                        # Quick Stats
+                        stats_cols = st.columns(4)
+                        
+                        with stats_cols[0]:
+                            current_price = data['Close'].iloc[-1]
+                            prev_close = data['Close'].iloc[-2]
+                            price_change = current_price - prev_close
+                            price_change_pct = (price_change / prev_close) * 100
+                            
+                            st.metric(
+                                "Current Price",
+                                f"${current_price:.2f}",
+                                f"{price_change_pct:+.2f}%"
+                            )
+                        
+                        with stats_cols[1]:
+                            high = data['High'].iloc[-1]
+                            low = data['Low'].iloc[-1]
+                            st.metric("Day Range", f"${low:.2f} - ${high:.2f}")
+                        
+                        with stats_cols[2]:
+                            volume = data['Volume'].iloc[-1]
+                            avg_volume = data['Volume'].mean()
+                            volume_change = ((volume - avg_volume) / avg_volume) * 100
+                            st.metric(
+                                "Volume",
+                                f"{volume:,.0f}",
+                                f"{volume_change:+.1f}% vs Avg"
+                            )
+                        
+                        with stats_cols[3]:
+                            volatility = data['Close'].pct_change().std() * np.sqrt(252) * 100
+                            st.metric("Volatility", f"{volatility:.1f}%")
+                        
+                    else:
+                        st.warning("No data available for the selected period")
+                        
+                except Exception as e:
+                    st.error(f"Error loading chart: {str(e)}")
+    
     except Exception as e:
-        st.error(f"Error in main content: {str(e)}")
+        st.error(f"Error fetching data: {str(e)}")
+else:
+    st.info("Please enter a valid stock symbol. Example: AAPL for Apple Inc.")
