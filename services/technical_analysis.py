@@ -2,6 +2,8 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import MinMaxScaler
 
 class TechnicalAnalysisService:
     def __init__(self):
@@ -92,13 +94,25 @@ class TechnicalAnalysisService:
     def _calculate_rsi(self, period=14):
         """Calculate RSI"""
         try:
+            if len(self.data) < period:
+                return {'RSI': None, 'signal': 'Neutral'}
+                
             delta = self.data['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-            rs = gain / loss
+            gain = delta.where(delta > 0, 0).rolling(window=period).mean()
+            loss = -delta.where(delta < 0, 0).rolling(window=period).mean()
+            
+            # Avoid division by zero
+            rs = pd.Series(0, index=gain.index)
+            valid_loss = loss != 0
+            rs[valid_loss] = gain[valid_loss] / loss[valid_loss]
+            
             rsi = 100 - (100 / (1 + rs))
             
-            current_rsi = rsi.iloc[-1]
+            # Check for valid data
+            if pd.isna(rsi.iloc[-1]):
+                return {'RSI': None, 'signal': 'Neutral'}
+            
+            current_rsi = float(rsi.iloc[-1])  # Convert to float
             
             # Generate signal
             if current_rsi > 70:
@@ -112,44 +126,47 @@ class TechnicalAnalysisService:
                 'RSI': current_rsi,
                 'signal': signal
             }
-        except:
+        except Exception as e:
+            print(f"Error in RSI calculation: {str(e)}")
             return {'RSI': None, 'signal': 'Neutral'}
     
     def _calculate_stochastic(self, period=14):
         """Calculate Stochastic Oscillator"""
         try:
+            if len(self.data) < period:
+                return {'K': None, 'D': None, 'signal': 'Neutral'}
+                
             low_min = self.data['Low'].rolling(window=period).min()
             high_max = self.data['High'].rolling(window=period).max()
             
             # Handle division by zero
+            k = pd.Series(0, index=self.data.index)
             denominator = high_max - low_min
-            k = pd.Series(0, index=self.data.index)  # Initialize with zeros
             valid_denom = denominator != 0
             k[valid_denom] = 100 * ((self.data['Close'][valid_denom] - low_min[valid_denom]) / denominator[valid_denom])
             
             d = k.rolling(window=3).mean()
             
-            # Check if we have valid data
-            if len(k) > 0 and not pd.isna(k.iloc[-1]) and not pd.isna(d.iloc[-1]):
-                current_k = k.iloc[-1]
-                current_d = d.iloc[-1]
-                
-                # Generate signal
-                if current_k > 80 and current_d > 80:
-                    signal = "Sell"
-                elif current_k < 20 and current_d < 20:
-                    signal = "Buy"
-                else:
-                    signal = "Neutral"
-                
-                return {
-                    'K': current_k,
-                    'D': current_d,
-                    'signal': signal
-                }
+            # Check for valid data
+            if pd.isna(k.iloc[-1]) or pd.isna(d.iloc[-1]):
+                return {'K': None, 'D': None, 'signal': 'Neutral'}
             
-            return {'K': None, 'D': None, 'signal': 'Neutral'}
+            current_k = float(k.iloc[-1])  # Convert to float
+            current_d = float(d.iloc[-1])  # Convert to float
             
+            # Generate signal
+            if current_k > 80 and current_d > 80:
+                signal = "Sell"
+            elif current_k < 20 and current_d < 20:
+                signal = "Buy"
+            else:
+                signal = "Neutral"
+            
+            return {
+                'K': current_k,
+                'D': current_d,
+                'signal': signal
+            }
         except Exception as e:
             print(f"Error in stochastic calculation: {str(e)}")
             return {'K': None, 'D': None, 'signal': 'Neutral'}
@@ -157,29 +174,48 @@ class TechnicalAnalysisService:
     def _calculate_obv(self):
         """Calculate On-Balance Volume"""
         try:
-            # Handle NaN values in Close price differences
+            if len(self.data) < 20:  # Need at least 20 points for the SMA
+                return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
+            
+            # Calculate price changes
             price_diff = self.data['Close'].diff()
-            price_diff = price_diff.fillna(0)
             
             # Calculate OBV
-            obv = (np.sign(price_diff) * self.data['Volume']).fillna(0).cumsum()
+            obv = pd.Series(0, index=self.data.index)
+            obv_values = []
+            current_obv = 0
             
-            # Calculate OBV trend
+            for i in range(len(self.data)):
+                if i == 0:
+                    obv_values.append(current_obv)
+                    continue
+                    
+                if price_diff.iloc[i] > 0:
+                    current_obv += self.data['Volume'].iloc[i]
+                elif price_diff.iloc[i] < 0:
+                    current_obv -= self.data['Volume'].iloc[i]
+                
+                obv_values.append(current_obv)
+            
+            obv = pd.Series(obv_values, index=self.data.index)
             obv_sma = obv.rolling(window=20).mean()
             
-            # Check if we have valid data
-            if len(obv) > 0 and not pd.isna(obv.iloc[-1]) and not pd.isna(obv_sma.iloc[-1]):
-                trend = "up" if obv.iloc[-1] > obv_sma.iloc[-1] else "down"
-                signal = "Buy" if trend == "up" else "Sell"
-                
-                return {
-                    'OBV': obv.iloc[-1],
-                    'trend': trend,
-                    'signal': signal
-                }
+            # Check for valid data
+            if pd.isna(obv.iloc[-1]) or pd.isna(obv_sma.iloc[-1]):
+                return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
             
-            return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
+            current_obv = float(obv.iloc[-1])  # Convert to float
+            current_sma = float(obv_sma.iloc[-1])  # Convert to float
             
+            # Generate signal
+            trend = "up" if current_obv > current_sma else "down"
+            signal = "Buy" if trend == "up" else "Sell"
+            
+            return {
+                'OBV': current_obv,
+                'trend': trend,
+                'signal': signal
+            }
         except Exception as e:
             print(f"Error in OBV calculation: {str(e)}")
             return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
@@ -187,36 +223,40 @@ class TechnicalAnalysisService:
     def _calculate_volume_analysis(self):
         """Analyze volume patterns"""
         try:
+            if len(self.data) < 20:  # Need at least 20 points for the MA
+                return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
+            
             volume = self.data['Volume']
             volume_ma = volume.rolling(window=20).mean()
             
-            # Check if we have valid data
-            if len(volume) > 0 and not pd.isna(volume.iloc[-1]) and not pd.isna(volume_ma.iloc[-1]):
-                current_volume = volume.iloc[-1]
-                current_ma = volume_ma.iloc[-1]
-                
-                # Determine volume trend
-                trend = "up" if current_volume > current_ma else "down"
-                
-                # Make sure we have valid price data
-                if not pd.isna(self.data['Close'].iloc[-1]) and not pd.isna(self.data['Open'].iloc[-1]):
-                    # Generate signal
-                    if trend == "up" and self.data['Close'].iloc[-1] > self.data['Open'].iloc[-1]:
-                        signal = "Buy"
-                    elif trend == "down" and self.data['Close'].iloc[-1] < self.data['Open'].iloc[-1]:
-                        signal = "Sell"
-                    else:
-                        signal = "Neutral"
-                    
-                    return {
-                        'Volume': current_volume,
-                        'MA20': current_ma,
-                        'trend': trend,
-                        'signal': signal
-                    }
+            # Check for valid data
+            if pd.isna(volume.iloc[-1]) or pd.isna(volume_ma.iloc[-1]):
+                return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
             
-            return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
+            current_volume = float(volume.iloc[-1])  # Convert to float
+            current_ma = float(volume_ma.iloc[-1])  # Convert to float
             
+            # Determine volume trend
+            trend = "up" if current_volume > current_ma else "down"
+            
+            # Make sure we have valid price data
+            if pd.isna(self.data['Close'].iloc[-1]) or pd.isna(self.data['Open'].iloc[-1]):
+                return {'Volume': current_volume, 'MA20': current_ma, 'trend': trend, 'signal': 'Neutral'}
+            
+            # Generate signal
+            if trend == "up" and self.data['Close'].iloc[-1] > self.data['Open'].iloc[-1]:
+                signal = "Buy"
+            elif trend == "down" and self.data['Close'].iloc[-1] < self.data['Open'].iloc[-1]:
+                signal = "Sell"
+            else:
+                signal = "Neutral"
+            
+            return {
+                'Volume': current_volume,
+                'MA20': current_ma,
+                'trend': trend,
+                'signal': signal
+            }
         except Exception as e:
             print(f"Error in volume analysis: {str(e)}")
             return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
