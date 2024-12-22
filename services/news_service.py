@@ -19,20 +19,14 @@ class NewsService:
             newsapi_articles = self._get_newsapi_articles(company_name)
             for article in newsapi_articles:
                 try:
-                    # Handle publishedAt date
-                    published_at = article.get('publishedAt')
-                    try:
-                        if published_at:
-                            if isinstance(published_at, str):
-                                date = pd.to_datetime(published_at).isoformat()
-                            elif isinstance(published_at, datetime):
-                                date = published_at.isoformat()
-                            else:
-                                date = datetime.now().isoformat()
-                        else:
-                            date = datetime.now().isoformat()
-                    except Exception:
-                        date = datetime.now().isoformat()
+                    # Parse the date properly
+                    date = datetime.now().isoformat()
+                    if article.get('publishedAt'):
+                        try:
+                            # NewsAPI returns dates in ISO 8601 format
+                            date = pd.to_datetime(article['publishedAt']).isoformat()
+                        except:
+                            pass
                     
                     all_articles.append({
                         'title': article.get('title', ''),
@@ -51,20 +45,15 @@ class NewsService:
             finnhub_articles = self._get_finnhub_articles(symbol)
             for article in finnhub_articles:
                 try:
-                    # Handle Finnhub timestamp
-                    timestamp = article.get('datetime', 0)
-                    try:
-                        if timestamp:
-                            if isinstance(timestamp, (int, float)):
-                                date = datetime.fromtimestamp(timestamp).isoformat()
-                            elif isinstance(timestamp, str):
-                                date = pd.to_datetime(timestamp).isoformat()
-                            else:
-                                date = datetime.now().isoformat()
-                        else:
-                            date = datetime.now().isoformat()
-                    except Exception:
-                        date = datetime.now().isoformat()
+                    # Parse the date properly
+                    date = datetime.now().isoformat()
+                    if article.get('datetime'):
+                        try:
+                            # Finnhub returns Unix timestamp
+                            timestamp = int(article['datetime'])
+                            date = datetime.fromtimestamp(timestamp).isoformat()
+                        except:
+                            pass
                     
                     all_articles.append({
                         'title': article.get('headline', ''),
@@ -103,23 +92,24 @@ class NewsService:
         except Exception as e:
             print(f"Error in get_company_news: {str(e)}")
             return pd.DataFrame()
-    
+
     def _get_newsapi_articles(self, company_name):
         """Get recent articles from NewsAPI"""
         try:
-            # Get news from the last 7 days to focus on recent news
+            # Get news from the last 7 days
+            end_date = datetime.now().date().isoformat()
+            start_date = (datetime.now() - timedelta(days=7)).date().isoformat()
+            
             response = self.newsapi.get_everything(
                 q=company_name,
                 language='en',
-                sort_by='relevancy',  # Changed to relevancy for better results
-                from_param=(datetime.now() - timedelta(days=7)).date().isoformat(),
-                to=datetime.now().date().isoformat(),
-                page_size=20  # Limit to 20 most relevant articles
+                sort_by='publishedAt',  # Sort by date
+                from_param=start_date,
+                to=end_date,
+                page_size=20  # Limit to 20 articles
             )
-            articles = response.get('articles', [])
-            # Sort by date to get most recent first
-            articles.sort(key=lambda x: x.get('publishedAt', ''), reverse=True)
-            return articles[:10]  # Return top 10 most recent articles
+            
+            return response.get('articles', [])
         except Exception as e:
             print(f"Error fetching NewsAPI articles: {str(e)}")
             return []
@@ -128,14 +118,13 @@ class NewsService:
         """Get recent articles from Finnhub"""
         try:
             end_date = int(datetime.now().timestamp())
-            # Get news from the last 7 days
             start_date = int((datetime.now() - timedelta(days=7)).timestamp())
             
-            news = self.finnhub_client.company_news(symbol, _from=start_date, to=end_date)
+            news = self.finnhub_client.company_news(symbol, _from=str(start_date), to=str(end_date))
             if news:
-                # Sort by datetime and get most recent articles
+                # Sort by datetime (timestamp)
                 news.sort(key=lambda x: x.get('datetime', 0), reverse=True)
-                return news[:10]  # Return top 10 most recent articles
+                return news[:20]  # Return top 20 most recent articles
             return []
         except Exception as e:
             print(f"Error fetching Finnhub news: {str(e)}")
