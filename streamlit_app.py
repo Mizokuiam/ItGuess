@@ -740,6 +740,26 @@ if symbol:
                     news_data = news_service.get_company_news(symbol, company_name)
                     
                     if news_data is not None and not news_data.empty:
+                        # Display sentiment distribution
+                        sentiment_counts = news_data['sentiment_category'].value_counts()
+                        
+                        # Create pie chart
+                        fig = go.Figure(data=[go.Pie(
+                            labels=sentiment_counts.index,
+                            values=sentiment_counts.values,
+                            hole=0.3,
+                            marker_colors=['#28a745', '#6c757d', '#dc3545']  # Green for positive, grey for neutral, red for negative
+                        )])
+                        
+                        fig.update_layout(
+                            title="Sentiment Distribution",
+                            showlegend=True,
+                            legend=dict(orientation="h"),
+                            margin=dict(t=30, b=0, l=0, r=0)
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
                         # Display news with sentiment
                         for _, row in news_data.iterrows():
                             try:
@@ -763,6 +783,9 @@ if symbol:
                                                     <span style='margin-left: 10px;'>Source: {row.get('source', 'Unknown')}</span>
                                                 </div>
                                                 <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>
+                                            </div>
+                                            <div style='margin-top: 10px;'>
+                                                <a href='{row['url']}' target='_blank' style='color: #007bff; text-decoration: none;'>Read more →</a>
                                             </div>
                                         </div>
                                     </div>
