@@ -16,18 +16,61 @@ class TechnicalAnalysisService:
             stock = yf.Ticker(symbol)
             self.data = stock.history(period="1y")
             
-            if self.data.empty:
+            # Validate data
+            if self.data is None or self.data.empty:
+                print(f"No data available for symbol: {symbol}")
                 return None
-            
+                
+            # Check for required columns
+            required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+            if not all(col in self.data.columns for col in required_columns):
+                print(f"Missing required columns for symbol: {symbol}")
+                return None
+                
+            # Check for sufficient data points
+            if len(self.data) < 50:  # Need at least 50 points for calculations
+                print(f"Insufficient data points for symbol: {symbol}")
+                return None
+                
             # Calculate all indicators
-            analysis = {
-                'ma_cross': self._calculate_ma_cross(),
-                'macd': self._calculate_macd(),
-                'rsi': self._calculate_rsi(),
-                'stochastic': self._calculate_stochastic(),
-                'obv': self._calculate_obv(),
-                'volume': self._calculate_volume_analysis()
-            }
+            analysis = {}
+            
+            # Calculate indicators one by one with error handling
+            try:
+                analysis['ma_cross'] = self._calculate_ma_cross()
+            except Exception as e:
+                print(f"Error calculating MA Cross: {str(e)}")
+                analysis['ma_cross'] = {'MA20': None, 'MA50': None, 'signal': 'Neutral'}
+                
+            try:
+                analysis['macd'] = self._calculate_macd()
+            except Exception as e:
+                print(f"Error calculating MACD: {str(e)}")
+                analysis['macd'] = {'MACD': None, 'Signal': None, 'signal': 'Neutral'}
+                
+            try:
+                analysis['rsi'] = self._calculate_rsi()
+            except Exception as e:
+                print(f"Error calculating RSI: {str(e)}")
+                analysis['rsi'] = {'RSI': None, 'signal': 'Neutral'}
+                
+            try:
+                analysis['stochastic'] = self._calculate_stochastic()
+            except Exception as e:
+                print(f"Error calculating Stochastic: {str(e)}")
+                analysis['stochastic'] = {'K': None, 'D': None, 'signal': 'Neutral'}
+                
+            try:
+                analysis['obv'] = self._calculate_obv()
+            except Exception as e:
+                print(f"Error calculating OBV: {str(e)}")
+                analysis['obv'] = {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
+                
+            try:
+                analysis['volume'] = self._calculate_volume_analysis()
+            except Exception as e:
+                print(f"Error calculating Volume Analysis: {str(e)}")
+                analysis['volume'] = {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
             
             return analysis
             

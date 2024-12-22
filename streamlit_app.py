@@ -246,11 +246,22 @@ with st.sidebar:
 # Main content
 if symbol:
     try:
+        # Validate symbol
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        if not info or 'regularMarketPrice' not in info:
+            st.error(f"Could not find data for symbol: {symbol}")
+            st.stop()
+        
         # Load company info and logo
         with st.spinner("Loading company information..."):
             company_info = get_company_info(symbol)
             company_logo = load_company_logo(symbol)
             
+            if not company_info:
+                st.warning("Could not load company information, but proceeding with analysis")
+                
         # Main header with company info
         col1, col2 = st.columns([1, 3])
         with col1:
@@ -417,159 +428,78 @@ if symbol:
                 # Get technical analysis data
                 analysis_data = technical_analysis.analyze(symbol)
                 
-                if analysis_data is not None:
-                    # Create three columns for different indicator categories
-                    trend_col, momentum_col, volume_col = st.columns(3)
+                if analysis_data is None:
+                    st.error("Unable to calculate technical indicators. This could be due to insufficient data or invalid symbol.")
+                    st.stop()
+                
+                # Create three columns for different indicator categories
+                trend_col, momentum_col, volume_col = st.columns(3)
+                
+                with trend_col:
+                    st.subheader("Trend Indicators")
                     
-                    with trend_col:
-                        st.subheader("Trend Indicators")
-                        
-                        # MA Cross
-                        ma_data = analysis_data['ma_cross']
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            y=ma_data['MA20'][-30:],
-                            name='MA20',
-                            line=dict(color='blue')
-                        ))
-                        fig.add_trace(go.Scatter(
-                            y=ma_data['MA50'][-30:],
-                            name='MA50',
-                            line=dict(color='orange')
-                        ))
-                        fig.update_layout(
-                            height=100,
-                            margin=dict(l=0, r=0, t=0, b=0),
-                            showlegend=False
-                        )
-                        st.metric(
-                            "MA Cross",
-                            ma_data['signal'],
-                            delta="Bullish" if ma_data['signal'] == "Buy" else "Bearish" if ma_data['signal'] == "Sell" else None,
-                            delta_color="normal"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # MACD
-                        macd_data = analysis_data['macd']
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            y=macd_data['MACD'][-30:],
-                            name='MACD',
-                            line=dict(color='blue')
-                        ))
-                        fig.add_trace(go.Scatter(
-                            y=macd_data['Signal'][-30:],
-                            name='Signal',
-                            line=dict(color='orange')
-                        ))
-                        fig.update_layout(
-                            height=100,
-                            margin=dict(l=0, r=0, t=0, b=0),
-                            showlegend=False
-                        )
-                        st.metric(
-                            "MACD",
-                            macd_data['signal'],
-                            delta="Bullish" if macd_data['signal'] == "Buy" else "Bearish" if macd_data['signal'] == "Sell" else None
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
+                    # MA Cross
+                    ma_data = analysis_data['ma_cross']
+                    if ma_data['MA20'] is not None and ma_data['MA50'] is not None:
+                        st.write("Moving Average Crossover")
+                        st.write(f"MA20: {ma_data['MA20']:.2f}")
+                        st.write(f"MA50: {ma_data['MA50']:.2f}")
+                        st.write(f"Signal: {ma_data['signal']}")
+                    else:
+                        st.warning("Moving Average data not available")
                     
-                    with momentum_col:
-                        st.subheader("Momentum Indicators")
-                        
-                        # RSI
-                        rsi_data = analysis_data['rsi']
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            y=rsi_data['RSI'][-30:],
-                            line=dict(color='purple')
-                        ))
-                        fig.add_hline(y=70, line_dash="dash", line_color="red")
-                        fig.add_hline(y=30, line_dash="dash", line_color="green")
-                        fig.update_layout(
-                            height=100,
-                            margin=dict(l=0, r=0, t=0, b=0),
-                            showlegend=False
-                        )
-                        st.metric(
-                            "RSI",
-                            f"{rsi_data['value']:.1f}",
-                            delta="Overbought" if rsi_data['value'] > 70 else "Oversold" if rsi_data['value'] < 30 else "Neutral"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Stochastic
-                        stoch_data = analysis_data['stochastic']
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            y=stoch_data['K'][-30:],
-                            name='%K',
-                            line=dict(color='blue')
-                        ))
-                        fig.add_trace(go.Scatter(
-                            y=stoch_data['D'][-30:],
-                            name='%D',
-                            line=dict(color='orange')
-                        ))
-                        fig.add_hline(y=80, line_dash="dash", line_color="red")
-                        fig.add_hline(y=20, line_dash="dash", line_color="green")
-                        fig.update_layout(
-                            height=100,
-                            margin=dict(l=0, r=0, t=0, b=0),
-                            showlegend=False
-                        )
-                        st.metric(
-                            "Stochastic",
-                            stoch_data['signal'],
-                            delta="Bullish" if stoch_data['signal'] == "Buy" else "Bearish" if stoch_data['signal'] == "Sell" else None
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
+                    # MACD
+                    macd_data = analysis_data['macd']
+                    if macd_data['MACD'] is not None and macd_data['Signal'] is not None:
+                        st.write("Moving Average Convergence Divergence (MACD)")
+                        st.write(f"MACD: {macd_data['MACD']:.2f}")
+                        st.write(f"Signal: {macd_data['Signal']:.2f}")
+                        st.write(f"Signal: {macd_data['signal']}")
+                    else:
+                        st.warning("MACD data not available")
+                
+                with momentum_col:
+                    st.subheader("Momentum Indicators")
                     
-                    with volume_col:
-                        st.subheader("Volume Indicators")
+                    # RSI
+                    rsi_data = analysis_data['rsi']
+                    if rsi_data['RSI'] is not None:
+                        st.write("Relative Strength Index (RSI)")
+                        st.write(f"RSI: {rsi_data['RSI']:.2f}")
+                        st.write(f"Signal: {rsi_data['signal']}")
+                    else:
+                        st.warning("RSI data not available")
                         
-                        # OBV
-                        obv_data = analysis_data['obv']
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            y=obv_data['OBV'][-30:],
-                            line=dict(color='green')
-                        ))
-                        fig.update_layout(
-                            height=100,
-                            margin=dict(l=0, r=0, t=0, b=0),
-                            showlegend=False
-                        )
-                        st.metric(
-                            "On-Balance Volume",
-                            obv_data['signal'],
-                            delta="Increasing" if obv_data['trend'] == "up" else "Decreasing" if obv_data['trend'] == "down" else None
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Volume
-                        volume_data = analysis_data['volume']
-                        fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            y=volume_data['Volume'][-30:],
-                            marker_color='lightblue'
-                        ))
-                        fig.add_trace(go.Scatter(
-                            y=volume_data['MA20'][-30:],
-                            line=dict(color='red')
-                        ))
-                        fig.update_layout(
-                            height=100,
-                            margin=dict(l=0, r=0, t=0, b=0),
-                            showlegend=False
-                        )
-                        st.metric(
-                            "Volume Analysis",
-                            volume_data['signal'],
-                            delta="Above Average" if volume_data['trend'] == "up" else "Below Average" if volume_data['trend'] == "down" else "Average"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
+                    # Stochastic
+                    stoch_data = analysis_data['stochastic']
+                    if stoch_data['K'] is not None and stoch_data['D'] is not None:
+                        st.write("Stochastic Oscillator")
+                        st.write(f"K: {stoch_data['K']:.2f}")
+                        st.write(f"D: {stoch_data['D']:.2f}")
+                        st.write(f"Signal: {stoch_data['signal']}")
+                    else:
+                        st.warning("Stochastic data not available")
+                
+                with volume_col:
+                    st.subheader("Volume Indicators")
+                    
+                    # OBV
+                    obv_data = analysis_data['obv']
+                    if obv_data['OBV'] is not None:
+                        st.write("On-Balance Volume (OBV)")
+                        st.write(f"OBV: {obv_data['OBV']:.2f}")
+                        st.write(f"Signal: {obv_data['signal']}")
+                    else:
+                        st.warning("OBV data not available")
+                    
+                    # Volume
+                    volume_data = analysis_data['volume']
+                    if volume_data['Volume'] is not None:
+                        st.write("Volume Analysis")
+                        st.write(f"Volume: {volume_data['Volume']:.2f}")
+                        st.write(f"Signal: {volume_data['signal']}")
+                    else:
+                        st.warning("Volume data not available")
                     
                     # Technical Analysis Summary
                     st.subheader("Technical Analysis Summary")
@@ -598,8 +528,32 @@ if symbol:
                         delta=f"{buy_signals} Buy vs {sell_signals} Sell signals"
                     )
                     
-                else:
-                    st.error("Unable to calculate technical indicators")
+                # Technical Analysis Summary
+                st.subheader("Technical Analysis Summary")
+                signals = [
+                    analysis_data['ma_cross']['signal'],
+                    analysis_data['macd']['signal'],
+                    analysis_data['rsi']['signal'],
+                    analysis_data['stochastic']['signal'],
+                    analysis_data['obv']['signal']
+                ]
+                
+                buy_signals = sum(1 for s in signals if s == "Buy")
+                sell_signals = sum(1 for s in signals if s == "Sell")
+                
+                summary = (
+                    "Strong Buy" if buy_signals >= 4 else
+                    "Buy" if buy_signals > sell_signals else
+                    "Strong Sell" if sell_signals >= 4 else
+                    "Sell" if sell_signals > buy_signals else
+                    "Neutral"
+                )
+                
+                st.metric(
+                    "Overall Signal",
+                    summary,
+                    delta=f"{buy_signals} Buy vs {sell_signals} Sell signals"
+                )
         
         with tabs[2]:  # Price Prediction Tab
             with st.spinner("Training prediction models..."):
