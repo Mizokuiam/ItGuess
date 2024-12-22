@@ -119,19 +119,37 @@ class NewsService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=7)
             
-            print(f"Fetching NewsAPI articles for: {company_name}")
+            # Create a more focused search query
+            search_query = f'"{company_name}" AND (stock OR shares OR market OR trading OR earnings OR investors)'
+            print(f"Fetching NewsAPI articles with query: {search_query}")
+            
             response = self.newsapi.get_everything(
-                q=company_name,
+                q=search_query,
                 language='en',
                 sort_by='publishedAt',
                 from_param=start_date.date().isoformat(),
                 to=end_date.date().isoformat(),
-                page_size=20
+                page_size=30  # Increased to get more relevant articles
             )
             
             articles = response.get('articles', [])
             print(f"NewsAPI returned {len(articles)} articles")
-            return articles if articles else []
+            
+            # Filter articles to ensure they are relevant to the company
+            filtered_articles = []
+            company_terms = company_name.lower().split()
+            
+            for article in articles:
+                title = article.get('title', '').lower()
+                description = article.get('description', '').lower()
+                content = title + ' ' + description
+                
+                # Check if any company term is in the content
+                if any(term in content for term in company_terms):
+                    filtered_articles.append(article)
+            
+            print(f"After filtering, keeping {len(filtered_articles)} relevant articles")
+            return filtered_articles
             
         except Exception as e:
             print(f"Error fetching NewsAPI articles: {str(e)}")
@@ -149,6 +167,12 @@ class NewsService:
                 _from=start_date.strftime('%Y-%m-%d'),
                 to=end_date.strftime('%Y-%m-%d')
             )
+            
+            if news:
+                # Sort by datetime to get most recent first
+                news.sort(key=lambda x: x.get('datetime', 0), reverse=True)
+                # Take top 30 most recent articles
+                news = news[:30]
             
             print(f"Finnhub returned {len(news) if news else 0} articles")
             return news if news else []
