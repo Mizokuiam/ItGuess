@@ -17,75 +17,8 @@ class PredictionService:
         self.history = {}
         self.confidence_intervals = {}
         self.feature_importance = {}
+        self.features = []
         
-    def _prepare_data(self, symbol):
-        """Prepare data for prediction"""
-        try:
-            # Get historical data with retry mechanism
-            max_retries = 3
-            retry_count = 0
-            df = None
-            
-            while retry_count < max_retries:
-                try:
-                    stock = yf.Ticker(symbol)
-                    df = stock.history(period="2y")
-                    if not df.empty:
-                        break
-                except Exception as e:
-                    print(f"Attempt {retry_count + 1} failed: {str(e)}")
-                retry_count += 1
-                if retry_count < max_retries:
-                    time.sleep(1)
-            
-            if df is None or df.empty:
-                print(f"Could not fetch data for {symbol} after {max_retries} attempts")
-                return None, None
-            
-            # Calculate technical indicators
-            df['MA5'] = df['Close'].rolling(window=5).mean()
-            df['MA20'] = df['Close'].rolling(window=20).mean()
-            df['RSI'] = self._calculate_rsi(df['Close'])
-            df['Volume_MA'] = df['Volume'].rolling(window=5).mean()
-            df['Returns'] = df['Close'].pct_change()
-            df['Volatility'] = df['Returns'].rolling(window=20).std()
-            
-            # Drop any rows with NaN values
-            df = df.dropna()
-            
-            # Create target variable (next day's closing price)
-            df['Target'] = df['Close'].shift(-1)
-            df = df.dropna()  # Drop the last row which will have NaN target
-            
-            # Check if we have enough data
-            if len(df) < 100:
-                print(f"Insufficient data points for {symbol}: {len(df)} < 100")
-                return None, None
-            
-            features = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                       'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
-            
-            # Validate features
-            if not all(col in df.columns for col in features):
-                print(f"Missing required features for {symbol}")
-                return None, None
-            
-            X = df[features].values
-            y = df['Target'].values
-            
-            # Create and fit the scaler
-            scaler = MinMaxScaler()
-            X_scaled = scaler.fit_transform(X)
-            
-            # Store the scaler
-            self.scalers[symbol] = scaler
-            
-            return X_scaled, y
-            
-        except Exception as e:
-            print(f"Error preparing data: {str(e)}")
-            return None, None
-    
     def _calculate_rsi(self, prices, period=14):
         """Calculate RSI"""
         delta = prices.diff()
@@ -94,6 +27,105 @@ class PredictionService:
         rs = gain / loss
         return 100 - (100 / (1 + rs))
     
+    def _calculate_momentum(self, prices, period=10):
+        """Calculate price momentum"""
+        return prices.diff(period)
+
+    def _calculate_bollinger_bands(self, prices, window=20):
+        """Calculate Bollinger Bands"""
+        rolling_mean = prices.rolling(window=window).mean()
+        rolling_std = prices.rolling(window=window).std()
+        upper_band = rolling_mean + (rolling_std * 2)
+        lower_band = rolling_mean - (rolling_std * 2)
+        return upper_band - lower_band  # Return bandwidth as a feature
+
+    def _calculate_macd(self, prices):
+        """Calculate MACD"""
+        exp1 = prices.ewm(span=12, adjust=False).mean()
+        exp2 = prices.ewm(span=26, adjust=False).mean()
+        macd = exp1 - exp2
+        signal = macd.ewm(span=9, adjust=False).mean()
+        return macd - signal  # Return MACD histogram
+
+    def _prepare_data(self, symbol):
+        """Prepare data for prediction"""
+        try:
+            # Get historical data
+            stock = yf.Ticker(symbol)
+            df = stock.history(period="2y")
+            
+            if df.empty:
+                print(f"No historical data available for {symbol}")
+                return None, None
+
+            # Basic price and volume features
+            df['Returns'] = df['Close'].pct_change()
+            df['Volume_Change'] = df['Volume'].pct_change()
+            df['Price_Range'] = (df['High'] - df['Low']) / df['Close']
+            
+            # Technical indicators
+            df['RSI'] = self._calculate_rsi(df['Close'])
+            df['Momentum'] = self._calculate_momentum(df['Close'])
+            df['BB_Width'] = self._calculate_bollinger_bands(df['Close'])
+            df['MACD_Hist'] = self._calculate_macd(df['Close'])
+            
+            # Moving averages and trends
+            df['MA5'] = df['Close'].rolling(window=5).mean()
+            df['MA20'] = df['Close'].rolling(window=20).mean()
+            df['MA50'] = df['Close'].rolling(window=50).mean()
+            df['Trend_5_20'] = df['MA5'] - df['MA20']
+            df['Trend_20_50'] = df['MA20'] - df['MA50']
+            
+            # Volume indicators
+            df['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
+            df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
+            df['Volume_Trend'] = df['Volume_MA5'] - df['Volume_MA20']
+            
+            # Volatility
+            df['Volatility'] = df['Returns'].rolling(window=20).std()
+            df['Volatility_Change'] = df['Volatility'].pct_change()
+            
+            # Price patterns
+            df['Higher_Highs'] = (df['High'] > df['High'].shift(1)).astype(int)
+            df['Lower_Lows'] = (df['Low'] < df['Low'].shift(1)).astype(int)
+            df['Price_Trend'] = df['Higher_Highs'] - df['Lower_Lows']
+            
+            # Target variable (next day's return)
+            df['Target'] = df['Close'].shift(-1) / df['Close'] - 1
+            
+            # Drop missing values
+            df = df.dropna()
+            
+            if len(df) < 100:
+                print(f"Insufficient data points for {symbol}")
+                return None, None
+            
+            # Features for prediction
+            features = [
+                'Returns', 'Volume_Change', 'Price_Range',
+                'RSI', 'Momentum', 'BB_Width', 'MACD_Hist',
+                'Trend_5_20', 'Trend_20_50',
+                'Volume_Trend', 'Volatility', 'Volatility_Change',
+                'Price_Trend'
+            ]
+            
+            X = df[features].values
+            y = df['Target'].values
+            
+            # Scale the features
+            scaler = MinMaxScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            # Store the scaler and feature list
+            self.scalers[symbol] = scaler
+            self.features = features
+            
+            return X_scaled, y
+            
+        except Exception as e:
+            print(f"Error preparing data: {str(e)}")
+            return None, None
+
     def train_models(self, symbol):
         """Train prediction models"""
         try:
@@ -170,8 +202,7 @@ class PredictionService:
     
     def _calculate_feature_importance(self, symbol):
         """Calculate and store feature importance"""
-        features = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                   'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
+        features = self.features
         
         rf_model = self.models[symbol]['rf']
         importance = rf_model.feature_importances_
@@ -193,54 +224,76 @@ class PredictionService:
                 print(f"No historical data available for {symbol}")
                 return None
             
-            # Calculate technical indicators
+            # Calculate all features
+            df['Returns'] = df['Close'].pct_change()
+            df['Volume_Change'] = df['Volume'].pct_change()
+            df['Price_Range'] = (df['High'] - df['Low']) / df['Close']
+            df['RSI'] = self._calculate_rsi(df['Close'])
+            df['Momentum'] = self._calculate_momentum(df['Close'])
+            df['BB_Width'] = self._calculate_bollinger_bands(df['Close'])
+            df['MACD_Hist'] = self._calculate_macd(df['Close'])
             df['MA5'] = df['Close'].rolling(window=5).mean()
             df['MA20'] = df['Close'].rolling(window=20).mean()
-            df['RSI'] = self._calculate_rsi(df['Close'])
-            df['Volume_MA'] = df['Volume'].rolling(window=5).mean()
-            df['Returns'] = df['Close'].pct_change()
+            df['MA50'] = df['Close'].rolling(window=50).mean()
+            df['Trend_5_20'] = df['MA5'] - df['MA20']
+            df['Trend_20_50'] = df['MA20'] - df['MA50']
+            df['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
+            df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
+            df['Volume_Trend'] = df['Volume_MA5'] - df['Volume_MA20']
             df['Volatility'] = df['Returns'].rolling(window=20).std()
+            df['Volatility_Change'] = df['Volatility'].pct_change()
+            df['Higher_Highs'] = (df['High'] > df['High'].shift(1)).astype(int)
+            df['Lower_Lows'] = (df['Low'] < df['Low'].shift(1)).astype(int)
+            df['Price_Trend'] = df['Higher_Highs'] - df['Lower_Lows']
             
-            # Get the last complete row
+            # Drop rows with missing values
             df = df.dropna()
+            
             if df.empty:
                 print(f"No complete data available for {symbol}")
                 return None
             
-            features = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                       'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
+            # Get the last row
+            last_row = df.iloc[-1:]
             
-            last_row = df.iloc[-1:][features]
+            # Prepare features in the same order as training
+            X = last_row[self.features].values
             
-            # Scale the features
-            scaler = self.scalers.get(symbol)
-            if scaler is None:
-                print(f"No scaler found for {symbol}")
-                return None
-            
-            X = scaler.transform(last_row)
+            # Scale features
+            X_scaled = self.scalers[symbol].transform(X)
             
             predictions = {}
             confidence_intervals = {}
             
-            # Make predictions
+            current_price = float(last_row['Close'].values[0])
+            
+            # Make predictions with each model
             for model_name, model in self.models[symbol].items():
                 try:
                     if model_name == 'rf':
                         # Get predictions from all trees
-                        tree_preds = np.array([tree.predict(X)[0] for tree in model.estimators_])
-                        pred = np.mean(tree_preds)
+                        tree_preds = np.array([tree.predict(X_scaled)[0] for tree in model.estimators_])
+                        return_pred = np.mean(tree_preds)
                         std_err = stats.sem(tree_preds)
-                        ci = stats.t.interval(0.95, len(tree_preds)-1, loc=pred, scale=std_err)
+                        return_ci = stats.t.interval(0.95, len(tree_preds)-1, loc=return_pred, scale=std_err)
+                        
+                        # Convert return prediction to price
+                        pred_price = current_price * (1 + return_pred)
+                        ci_prices = (current_price * (1 + return_ci[0]), current_price * (1 + return_ci[1]))
+                        
                     else:  # Neural Network
                         # Get multiple predictions
-                        preds = np.array([model.predict(X, verbose=0)[0][0] for _ in range(100)])
-                        pred = np.mean(preds)
-                        std_err = stats.sem(preds)
-                        ci = stats.t.interval(0.95, len(preds)-1, loc=pred, scale=std_err)
+                        return_preds = np.array([model.predict(X_scaled, verbose=0)[0][0] for _ in range(100)])
+                        return_pred = np.mean(return_preds)
+                        std_err = stats.sem(return_preds)
+                        return_ci = stats.t.interval(0.95, len(return_preds)-1, loc=return_pred, scale=std_err)
+                        
+                        # Convert return prediction to price
+                        pred_price = current_price * (1 + return_pred)
+                        ci_prices = (current_price * (1 + return_ci[0]), current_price * (1 + return_ci[1]))
                     
-                    predictions[model_name] = float(pred)
-                    confidence_intervals[model_name] = (float(ci[0]), float(ci[1]))
+                    predictions[model_name] = float(pred_price)
+                    confidence_intervals[model_name] = (float(ci_prices[0]), float(ci_prices[1]))
                     
                 except Exception as e:
                     print(f"Error making prediction with {model_name}: {str(e)}")
@@ -255,6 +308,8 @@ class PredictionService:
             
         except Exception as e:
             print(f"Error making predictions: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_prediction_history(self, symbol):
