@@ -394,7 +394,7 @@ if symbol:
                 st.markdown(f"<h1 class='gradient-text'>{symbol}</h1>", unsafe_allow_html=True)
 
         # Create tabs with animation
-        tab_names = ["Overview", "Technical Analysis", "Price Prediction", "Live Chart"]
+        tab_names = ["Overview", "Technical Analysis", "Price Prediction", "News Sentiment", "Live Chart"]
         tabs = st.tabs(tab_names)
 
         with tabs[0]:  # Overview Tab
@@ -616,7 +616,97 @@ if symbol:
                     </div>
                     """, unsafe_allow_html=True)
 
-        with tabs[2]:  # News Sentiment Tab
+        with tabs[2]:  # Price Prediction Tab
+            st.subheader("Price Prediction Analysis")
+            
+            with st.spinner("Calculating price predictions..."):
+                try:
+                    # Get prediction data
+                    prediction_data = prediction_service.predict_price(symbol)
+                    
+                    if prediction_data:
+                        col1, col2 = st.columns([2, 1])
+                        
+                        with col1:
+                            # Plot predicted vs actual prices
+                            fig = go.Figure()
+                            
+                            # Add actual prices
+                            fig.add_trace(go.Scatter(
+                                x=prediction_data['dates'],
+                                y=prediction_data['actual_prices'],
+                                name='Actual Price',
+                                line=dict(color='blue')
+                            ))
+                            
+                            # Add predicted prices
+                            fig.add_trace(go.Scatter(
+                                x=prediction_data['dates'],
+                                y=prediction_data['predicted_prices'],
+                                name='Predicted Price',
+                                line=dict(color='red', dash='dash')
+                            ))
+                            
+                            # Add confidence intervals
+                            fig.add_trace(go.Scatter(
+                                x=prediction_data['dates'] + prediction_data['dates'][::-1],
+                                y=prediction_data['upper_bound'] + prediction_data['lower_bound'][::-1],
+                                fill='toself',
+                                fillcolor='rgba(255,0,0,0.1)',
+                                line=dict(color='rgba(255,0,0,0)'),
+                                name='95% Confidence Interval'
+                            ))
+                            
+                            fig.update_layout(
+                                title=f"{symbol} Price Prediction",
+                                xaxis_title="Date",
+                                yaxis_title="Price",
+                                template='plotly_white',
+                                height=400
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                        
+                        with col2:
+                            # Display prediction metrics
+                            st.markdown("### Prediction Metrics")
+                            
+                            accuracy = prediction_data['accuracy']
+                            mse = prediction_data['mse']
+                            r2 = prediction_data['r2']
+                            
+                            st.metric("Model Accuracy", f"{accuracy:.1f}%")
+                            st.metric("Mean Squared Error", f"{mse:.4f}")
+                            st.metric("R² Score", f"{r2:.4f}")
+                            
+                            # Feature importance
+                            st.markdown("### Feature Importance")
+                            for feature, importance in prediction_data['feature_importance'].items():
+                                st.metric(feature, f"{importance:.2f}%")
+                            
+                            # Next day prediction
+                            st.markdown("### Next Day Prediction")
+                            next_day_price = prediction_data['next_day_prediction']
+                            current_price = prediction_data['actual_prices'][-1]
+                            price_change = ((next_day_price - current_price) / current_price) * 100
+                            
+                            price_color = "green" if price_change > 0 else "red"
+                            st.markdown(f"""
+                            <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+                                <h3 style='margin: 0;'>Predicted Price</h3>
+                                <h2 style='color: {price_color}; margin: 10px 0;'>${next_day_price:.2f}</h2>
+                                <p style='color: {price_color}; margin: 0;'>{price_change:+.2f}%</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.error("Unable to generate predictions. Please try again later.")
+                        
+                except Exception as e:
+                    st.error(f"Error in price prediction: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+
+        with tabs[3]:  # News Sentiment Tab
             st.subheader("News Sentiment Analysis")
             
             with st.spinner("Fetching latest news..."):
@@ -648,8 +738,8 @@ if symbol:
                             """, unsafe_allow_html=True)
                 else:
                     st.info("No recent news available. Please check back later.")
-        
-        with tabs[3]:  # Live Chart Tab
+
+        with tabs[4]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
             
             # Time period selection
