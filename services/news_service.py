@@ -45,8 +45,20 @@ class NewsService:
             start_date = int((datetime.now() - timedelta(days=30)).timestamp())
             
             news = self.finnhub_client.company_news(symbol, _from=start_date, to=end_date)
-            return news
-        except:
+            
+            # Convert Finnhub response to match NewsAPI format
+            formatted_news = []
+            for article in news:
+                formatted_news.append({
+                    'title': article.get('headline', ''),
+                    'summary': article.get('summary', ''),
+                    'url': article.get('url', ''),
+                    'publishedAt': datetime.fromtimestamp(article.get('datetime', 0)).isoformat(),
+                    'source': {'name': article.get('source', 'Finnhub')}
+                })
+            return formatted_news
+        except Exception as e:
+            print(f"Error fetching Finnhub news: {str(e)}")
             return []
             
     def _process_articles(self, articles):
@@ -54,30 +66,17 @@ class NewsService:
         processed_articles = []
         
         for article in articles:
-            # Handle different API response formats
-            if isinstance(article, dict):
-                # NewsAPI format
-                title = article.get('title', '')
-                description = article.get('description', '') or article.get('summary', '')
-                url = article.get('url', '')
-                published = article.get('publishedAt', '')
-                source = article.get('source', {}).get('name', 'Unknown')
-            else:
-                # Finnhub format
-                title = getattr(article, 'headline', '')
-                description = getattr(article, 'summary', '')
-                url = getattr(article, 'url', '')
-                published = datetime.fromtimestamp(getattr(article, 'datetime', 0)).isoformat()
-                source = getattr(article, 'source', 'Finnhub')
-            
-            # Skip articles with no content
-            if not title and not description:
-                continue
-                
-            # Combine text for sentiment analysis
-            text = f"{title} {description}"
-            
             try:
+                # Extract text for sentiment analysis
+                title = article.get('title', '')
+                summary = article.get('summary', '') or article.get('description', '')
+                
+                if not title and not summary:
+                    continue
+                
+                # Combine text for sentiment analysis
+                text = f"{title} {summary}"
+                
                 # Perform sentiment analysis
                 blob = TextBlob(text)
                 sentiment = blob.sentiment.polarity
@@ -92,10 +91,10 @@ class NewsService:
                 
                 processed_articles.append({
                     'title': title,
-                    'summary': description,
-                    'url': url,
-                    'date': published,
-                    'source': source,
+                    'summary': summary,
+                    'url': article.get('url', ''),
+                    'date': article.get('publishedAt', ''),
+                    'source': article.get('source', {}).get('name', 'Unknown'),
                     'sentiment': sentiment,
                     'sentiment_category': sentiment_category
                 })

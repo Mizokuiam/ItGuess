@@ -731,37 +731,44 @@ if symbol:
             st.subheader("News Sentiment Analysis")
             
             with st.spinner("Fetching latest news..."):
-                # Get company info for better news search
-                info = stock.info
-                company_name = info.get('longName', symbol)
-                
-                # Fetch news data
-                news_data = news_service.get_company_news(symbol, company_name)
-                
-                if news_data is not None and not news_data.empty:
-                    # Display news with sentiment
-                    for _, row in news_data.iterrows():
-                        with st.container():
-                            sentiment_color = "#28a745" if row['sentiment'] > 0.2 else "#dc3545" if row['sentiment'] < -0.2 else "#6c757d"
-                            
-                            st.markdown(f"""
-                            <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
-                                <div style='border-left: 4px solid {sentiment_color}; padding-left: 10px;'>
-                                    <h4 style='margin: 0; color: #333;'>{row['title']}</h4>
-                                    <p style='margin: 10px 0; color: #666;'>{row['summary']}</p>
-                                    <div style='display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 0.9em;'>
-                                        <div>
-                                            <span>{row['date'].strftime('%Y-%m-%d %H:%M')}</span>
-                                            <span style='margin-left: 10px;'>Source: {row['source']}</span>
+                try:
+                    # Get company info for better news search
+                    info = stock.info
+                    company_name = info.get('longName', symbol)
+                    
+                    # Fetch news data
+                    news_data = news_service.get_company_news(symbol, company_name)
+                    
+                    if news_data is not None and not news_data.empty:
+                        # Display news with sentiment
+                        for _, row in news_data.iterrows():
+                            try:
+                                with st.container():
+                                    sentiment_color = "#28a745" if row['sentiment'] > 0.2 else "#dc3545" if row['sentiment'] < -0.2 else "#6c757d"
+                                    
+                                    st.markdown(f"""
+                                    <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
+                                        <div style='border-left: 4px solid {sentiment_color}; padding-left: 10px;'>
+                                            <h4 style='margin: 0; color: #333;'>{row['title']}</h4>
+                                            <p style='margin: 10px 0; color: #666;'>{row.get('summary', 'No summary available')}</p>
+                                            <div style='display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 0.9em;'>
+                                                <div>
+                                                    <span>{pd.to_datetime(row['date']).strftime('%Y-%m-%d %H:%M')}</span>
+                                                    <span style='margin-left: 10px;'>Source: {row['source']}</span>
+                                                </div>
+                                                <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>
+                                            </div>
                                         </div>
-                                        <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>
                                     </div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                else:
-                    st.info("No recent news available. Please check back later.")
-
+                                    """, unsafe_allow_html=True)
+                            except Exception as e:
+                                print(f"Error displaying article: {str(e)}")
+                                continue
+                    else:
+                        st.info("No recent news available. Please check back later.")
+                except Exception as e:
+                    st.error(f"Error fetching news: {str(e)}")
+                    
         with tabs[4]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
             
