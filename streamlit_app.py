@@ -748,7 +748,7 @@ if symbol:
                                     
                                     # Format date
                                     try:
-                                        date_str = pd.to_datetime(row['date']).strftime('%Y-%m-%d %H:%M')
+                                        date_str = row['date'].strftime('%Y-%m-%d %H:%M')
                                     except:
                                         date_str = 'Date not available'
                                     
@@ -760,7 +760,7 @@ if symbol:
                                             <div style='display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 0.9em;'>
                                                 <div>
                                                     <span>{date_str}</span>
-                                                    <span style='margin-left: 10px;'>Source: {row['source']}</span>
+                                                    <span style='margin-left: 10px;'>Source: {row.get('source', 'Unknown')}</span>
                                                 </div>
                                                 <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>
                                             </div>

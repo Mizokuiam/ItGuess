@@ -13,16 +13,70 @@ class NewsService:
     def get_company_news(self, symbol, company_name):
         """Get news articles for a company"""
         try:
-            # Get news from both APIs
+            # Get news from both APIs and format them consistently
             news_api_articles = self._get_newsapi_articles(company_name)
             finnhub_articles = self._get_finnhub_articles(symbol)
             
-            # Combine and process articles
-            all_articles = news_api_articles + finnhub_articles
-            return self._process_articles(all_articles)
+            # Process each source separately to ensure consistent format
+            processed_articles = []
+            
+            # Process NewsAPI articles
+            for article in news_api_articles:
+                processed_articles.append({
+                    'title': article.get('title', ''),
+                    'summary': article.get('description', ''),
+                    'url': article.get('url', ''),
+                    'date': article.get('publishedAt', datetime.now().isoformat()),
+                    'source': article.get('source', {}).get('name', 'NewsAPI')
+                })
+            
+            # Process Finnhub articles
+            for article in finnhub_articles:
+                timestamp = article.get('datetime', 0)
+                processed_articles.append({
+                    'title': article.get('headline', ''),
+                    'summary': article.get('summary', ''),
+                    'url': article.get('url', ''),
+                    'date': datetime.fromtimestamp(timestamp).isoformat() if timestamp else datetime.now().isoformat(),
+                    'source': article.get('source', 'Finnhub')
+                })
+            
+            # Create DataFrame
+            df = pd.DataFrame(processed_articles)
+            
+            if not df.empty:
+                # Convert dates to datetime
+                df['date'] = pd.to_datetime(df['date'])
+                
+                # Add sentiment analysis
+                df['sentiment'] = df.apply(lambda row: self._analyze_sentiment(row['title'], row['summary']), axis=1)
+                df['sentiment_category'] = df['sentiment'].apply(self._get_sentiment_category)
+                
+                # Sort by date
+                df = df.sort_values('date', ascending=False)
+            
+            return df
+            
         except Exception as e:
             print(f"Error fetching news: {str(e)}")
-            return None
+            return pd.DataFrame()
+            
+    def _analyze_sentiment(self, title, summary):
+        """Analyze sentiment of text"""
+        try:
+            text = f"{title} {summary}"
+            blob = TextBlob(text)
+            return blob.sentiment.polarity
+        except:
+            return 0
+            
+    def _get_sentiment_category(self, sentiment):
+        """Get sentiment category based on polarity"""
+        if sentiment > 0.1:
+            return "Positive"
+        elif sentiment < -0.1:
+            return "Negative"
+        return "Neutral"
             
     def _get_newsapi_articles(self, company_name):
         """Get articles from NewsAPI"""
@@ -34,21 +88,7 @@ class NewsService:
                 from_param=(datetime.now() - timedelta(days=30)).date().isoformat(),
                 to=datetime.now().date().isoformat()
             )
-            
-            # Convert NewsAPI response to standard format
-            articles = response.get('articles', [])
-            formatted_articles = []
-            
-            for article in articles:
-                formatted_articles.append({
-                    'title': article.get('title', ''),
-                    'summary': article.get('description', ''),
-                    'url': article.get('url', ''),
-                    'date': article.get('publishedAt', ''),
-                    'source': {'name': article.get('source', {}).get('name', 'NewsAPI')}
-                })
-            
-            return formatted_articles
+            return response.get('articles', [])
         except Exception as e:
             print(f"Error fetching NewsAPI articles: {str(e)}")
             return []
@@ -60,82 +100,11 @@ class NewsService:
             start_date = int((datetime.now() - timedelta(days=30)).timestamp())
             
             news = self.finnhub_client.company_news(symbol, _from=start_date, to=end_date)
-            
-            # Convert Finnhub response to match NewsAPI format
-            formatted_news = []
-            for article in news:
-                timestamp = article.get('datetime', 0)
-                formatted_news.append({
-                    'title': article.get('headline', ''),
-                    'summary': article.get('summary', ''),
-                    'url': article.get('url', ''),
-                    'date': datetime.fromtimestamp(timestamp).isoformat() if timestamp else '',
-                    'source': {'name': article.get('source', 'Finnhub')}
-                })
-            return formatted_news
+            return news if news else []
         except Exception as e:
             print(f"Error fetching Finnhub news: {str(e)}")
             return []
             
-    def _process_articles(self, articles):
-        """Process and analyze sentiment of articles"""
-        processed_articles = []
-        
-        for article in articles:
-            try:
-                # Extract text for sentiment analysis
-                title = article.get('title', '')
-                summary = article.get('summary', '')
-                
-                if not title and not summary:
-                    continue
-                
-                # Combine text for sentiment analysis
-                text = f"{title} {summary}"
-                
-                # Perform sentiment analysis
-                blob = TextBlob(text)
-                sentiment = blob.sentiment.polarity
-                
-                # Categorize sentiment
-                if sentiment > 0.1:
-                    sentiment_category = "Positive"
-                elif sentiment < -0.1:
-                    sentiment_category = "Negative"
-                else:
-                    sentiment_category = "Neutral"
-                
-                # Ensure date is in ISO format
-                date = article.get('date', '')
-                if date:
-                    try:
-                        # Parse and standardize date format
-                        parsed_date = pd.to_datetime(date)
-                        date = parsed_date.isoformat()
-                    except:
-                        date = datetime.now().isoformat()
-                
-                processed_articles.append({
-                    'title': title,
-                    'summary': summary,
-                    'url': article.get('url', ''),
-                    'date': date,
-                    'source': article.get('source', {}).get('name', 'Unknown'),
-                    'sentiment': sentiment,
-                    'sentiment_category': sentiment_category
-                })
-            except Exception as e:
-                print(f"Error processing article: {str(e)}")
-                continue
-        
-        # Create DataFrame and sort by date
-        df = pd.DataFrame(processed_articles)
-        if not df.empty:
-            df['date'] = pd.to_datetime(df['date'])
-            df = df.sort_values('date', ascending=False)
-        
-        return df
-    
     def get_peer_comparison(self, symbol):
         """Get peer comparison data"""
         try:
