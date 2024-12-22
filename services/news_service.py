@@ -19,11 +19,17 @@ class NewsService:
             newsapi_articles = self._get_newsapi_articles(company_name)
             for article in newsapi_articles:
                 try:
+                    published_at = article.get('publishedAt')
+                    if published_at is None:
+                        published_at = datetime.now().isoformat()
+                    elif isinstance(published_at, datetime):
+                        published_at = published_at.isoformat()
+                    
                     all_articles.append({
                         'title': article.get('title', ''),
                         'summary': article.get('description', ''),
                         'url': article.get('url', ''),
-                        'date': article.get('publishedAt', datetime.now().isoformat()),
+                        'date': published_at,
                         'source': article.get('source', {}).get('name', 'NewsAPI'),
                         'sentiment': None,  # Will be calculated later
                         'sentiment_category': None  # Will be calculated later
