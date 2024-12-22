@@ -15,148 +15,155 @@ from io import BytesIO
 # Page config
 st.set_page_config(
     page_title="ItGuess - Stock Analysis",
-    page_icon="💾",
+    page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for retro Mac design
+# Custom CSS for modern design
 st.markdown("""
     <style>
         /* Global Styles */
         .stApp {
-            background-color: #e5e5e5;
-            font-family: "Chicago", "Helvetica Neue", sans-serif;
+            background-color: #ffffff;
         }
         
         /* Header styling */
         h1 {
-            font-family: "Chicago", "Helvetica Neue", sans-serif;
-            font-weight: 700;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 800;
             font-size: 2.5rem;
-            color: #000000;
-            text-align: center;
-            margin: 2rem 0;
-            padding: 1rem;
-            background-color: #ffffff;
-            border: 2px solid #000000;
-            border-radius: 8px;
+            background: linear-gradient(120deg, #FF4B4B, #7E56DA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 1rem 0;
         }
         
-        /* Retro button styling */
-        .stButton button {
-            background-color: #ffffff;
-            color: #000000;
-            border: 2px solid #000000;
-            border-radius: 8px;
-            font-weight: bold;
-            padding: 0.5rem 1rem;
-            box-shadow: 2px 2px 0px #000000;
-            transition: all 0.1s ease;
-        }
-        
-        .stButton button:hover {
-            transform: translate(2px, 2px);
-            box-shadow: 0px 0px 0px #000000;
+        /* Subheader styling */
+        h2, h3 {
+            color: #0F1642;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 600;
         }
         
         /* Card styling */
         div.stMetric {
-            background-color: #ffffff;
-            border: 2px solid #000000;
-            border-radius: 8px;
-            padding: 1rem;
-            box-shadow: 4px 4px 0px #000000;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
         }
         
         /* Metrics styling */
         div[data-testid="stMetricValue"] {
-            font-size: 1.8rem !important;
-            color: #000000 !important;
-            font-weight: bold !important;
+            font-size: 2rem !important;
+            font-weight: 700 !important;
+            color: #0F1642 !important;
+        }
+        
+        div[data-testid="stMetricLabel"] {
+            font-size: 1rem !important;
+            color: #666666 !important;
         }
         
         /* Sidebar styling */
         section[data-testid="stSidebar"] {
-            background-color: #ffffff;
-            border-right: 2px solid #000000;
-        }
-        
-        section[data-testid="stSidebar"] > div {
+            background-color: #f8f9fa;
             padding: 2rem 1rem;
         }
         
-        /* Quick links styling */
-        .quick-links {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin: 2rem 0;
+        section[data-testid="stSidebar"] .stTextInput input {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 1rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
         }
         
-        .quick-link {
-            background-color: #ffffff;
-            border: 2px solid #000000;
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
-            color: #000000;
-            text-decoration: none;
-            font-weight: bold;
-            box-shadow: 2px 2px 0px #000000;
+        section[data-testid="stSidebar"] .stTextInput input:focus {
+            border-color: #7E56DA;
+            box-shadow: 0 0 0 3px rgba(126, 86, 218, 0.1);
         }
         
-        .quick-link:hover {
-            transform: translate(2px, 2px);
-            box-shadow: 0px 0px 0px #000000;
+        /* Button styling */
+        .stButton button {
+            background: linear-gradient(135deg, #FF4B4B, #7E56DA);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
         
-        /* Input fields */
-        .stTextInput input {
-            border: 2px solid #000000;
-            border-radius: 8px;
-            background-color: #ffffff;
-            padding: 0.5rem;
+        .stButton button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(126, 86, 218, 0.2);
         }
         
         /* Tabs styling */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0.5rem;
-            background-color: #ffffff;
-            padding: 1rem;
-            border: 2px solid #000000;
-            border-radius: 8px;
+            gap: 1rem;
+            background-color: transparent;
         }
         
         .stTabs [data-baseweb="tab"] {
-            background-color: #ffffff;
-            border: 2px solid #000000;
-            border-radius: 8px;
-            color: #000000;
-            font-weight: bold;
-            box-shadow: 2px 2px 0px #000000;
+            background-color: transparent;
+            border: none;
+            color: #666666;
+            font-weight: 600;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            transition: all 0.3s ease;
         }
         
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background-color: #000000;
-            color: #ffffff;
-            box-shadow: none;
-            transform: translate(2px, 2px);
+            background: linear-gradient(135deg, #FF4B4B20, #7E56DA20);
+            color: #7E56DA;
         }
         
         /* Plot styling */
         .js-plotly-plot {
-            background-color: #ffffff;
-            border: 2px solid #000000;
-            border-radius: 8px;
+            border-radius: 16px;
             padding: 1rem;
-            box-shadow: 4px 4px 0px #000000;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
         }
         
-        /* Retro icon */
-        .retro-icon {
-            font-size: 3rem;
-            text-align: center;
-            margin-bottom: 1rem;
+        /* Search box styling */
+        .search-container {
+            position: relative;
+            margin: 2rem 0;
+        }
+        
+        .search-container input {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            font-size: 1.1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .search-container input:focus {
+            border-color: #7E56DA;
+            box-shadow: 0 0 0 3px rgba(126, 86, 218, 0.1);
+            outline: none;
+        }
+        
+        /* Custom gradients */
+        .gradient-text {
+            background: linear-gradient(120deg, #FF4B4B, #7E56DA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #FF4B4B20, #7E56DA20);
         }
     </style>
 """, unsafe_allow_html=True)
@@ -204,38 +211,14 @@ technical_analysis, prediction_service, news_service = get_services()
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div class='retro-icon'>💾</div>", unsafe_allow_html=True)
-    st.markdown("<h1 style='text-align: center; margin-bottom: 2rem;'>ItGuess</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='gradient-text' style='text-align: center;'>ItGuess</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666666; margin-bottom: 2rem;'>Smart Stock Analysis</p>", unsafe_allow_html=True)
     
-    # Quick links
-    st.markdown("""
-        <div class="quick-links">
-            <a href="#" class="quick-link">Overview</a>
-            <a href="#" class="quick-link">Analysis</a>
-            <a href="#" class="quick-link">Charts</a>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Stock input with popular stocks
-    with st.expander("Stock Selection", expanded=True):
-        popular_stocks = {
-            "Popular Tech": ["AAPL", "GOOGL", "MSFT", "META", "NVDA"],
-            "Popular EV": ["TSLA", "RIVN", "NIO", "LCID"],
-            "Popular Finance": ["JPM", "BAC", "GS", "V", "MA"],
-            "Popular Retail": ["AMZN", "WMT", "TGT", "COST"],
-            "Popular Crypto": ["COIN", "MSTR", "RIOT", "MARA"]
-        }
-        
-        for sector, stocks in popular_stocks.items():
-            cols = st.columns(len(stocks))
-            for i, stock in enumerate(stocks):
-                if cols[i].button(stock, key=f"quick_{stock}"):
-                    st.session_state.symbol = stock
-        
-        symbol = st.text_input("Enter Stock Symbol (e.g., AAPL)", 
-                             value=st.session_state.get('symbol', 'AAPL'),
-                             help="Enter the stock symbol you want to analyze")
-    
+    # Search box
+    st.markdown("<div class='search-container'>", unsafe_allow_html=True)
+    symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT")
+    st.markdown("</div>", unsafe_allow_html=True)
+
     # Analysis settings
     with st.expander("Analysis Settings", expanded=True):
         st.subheader("Prediction Settings")
@@ -278,11 +261,11 @@ if symbol:
                 
         with col2:
             if company_info:
-                st.markdown(f"<h1 class='main-title'>{company_info['name']} ({symbol})</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h1 class='gradient-text'>{company_info['name']} ({symbol})</h1>", unsafe_allow_html=True)
                 st.markdown(f"<p class='company-meta'>{company_info['sector']} | {company_info['industry']}</p>", 
                           unsafe_allow_html=True)
             else:
-                st.markdown(f"<h1 class='main-title'>{symbol}</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h1 class='gradient-text'>{symbol}</h1>", unsafe_allow_html=True)
 
         # Create tabs with animation
         tab_names = ["Overview", "Technical Analysis", "Price Prediction", "Live Chart"]

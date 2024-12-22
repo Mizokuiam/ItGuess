@@ -36,31 +36,46 @@ class TechnicalAnalysisService:
     def _calculate_ma_cross(self):
         """Calculate Moving Average Crossover"""
         try:
+            if len(self.data) < 50:  # Need at least 50 data points for MA50
+                return {'MA20': None, 'MA50': None, 'signal': 'Neutral'}
+                
             ma20 = self.data['Close'].rolling(window=20).mean()
             ma50 = self.data['Close'].rolling(window=50).mean()
+            
+            # Check for valid data
+            if pd.isna(ma20.iloc[-1]) or pd.isna(ma50.iloc[-1]):
+                return {'MA20': None, 'MA50': None, 'signal': 'Neutral'}
             
             # Generate signal
             signal = "Buy" if ma20.iloc[-1] > ma50.iloc[-1] else "Sell"
             
             return {
-                'MA20': ma20.iloc[-1],
-                'MA50': ma50.iloc[-1],
+                'MA20': float(ma20.iloc[-1]),  # Convert to float to avoid scalar issues
+                'MA50': float(ma50.iloc[-1]),
                 'signal': signal
             }
-        except:
+        except Exception as e:
+            print(f"Error in MA cross calculation: {str(e)}")
             return {'MA20': None, 'MA50': None, 'signal': 'Neutral'}
     
     def _calculate_macd(self):
         """Calculate MACD"""
         try:
+            if len(self.data) < 26:  # Need at least 26 data points for MACD
+                return {'MACD': None, 'Signal': None, 'signal': 'Neutral'}
+                
             exp1 = self.data['Close'].ewm(span=12, adjust=False).mean()
             exp2 = self.data['Close'].ewm(span=26, adjust=False).mean()
             macd = exp1 - exp2
-            signal = macd.ewm(span=9, adjust=False).mean()
+            signal_line = macd.ewm(span=9, adjust=False).mean()
+            
+            # Check for valid data
+            if pd.isna(macd.iloc[-1]) or pd.isna(signal_line.iloc[-1]):
+                return {'MACD': None, 'Signal': None, 'signal': 'Neutral'}
             
             # Generate signal
-            current_macd = macd.iloc[-1]
-            current_signal = signal.iloc[-1]
+            current_macd = float(macd.iloc[-1])  # Convert to float
+            current_signal = float(signal_line.iloc[-1])  # Convert to float
             
             buy_signal = current_macd > current_signal
             signal_str = "Buy" if buy_signal else "Sell"
@@ -70,7 +85,8 @@ class TechnicalAnalysisService:
                 'Signal': current_signal,
                 'signal': signal_str
             }
-        except:
+        except Exception as e:
+            print(f"Error in MACD calculation: {str(e)}")
             return {'MACD': None, 'Signal': None, 'signal': 'Neutral'}
     
     def _calculate_rsi(self, period=14):
