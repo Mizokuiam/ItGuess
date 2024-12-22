@@ -7,6 +7,6 @@ tensorflow-cpu>=2.12.0,<3.0.0
 plotly>=5.18.0
 python-dotenv>=1.0.0
 requests>=2.31.0
-pandas-ta>=0.3.14b0
+pandas-ta>=0.3.14b
 scipy>=1.11.3
 finnhub-python>=2.4.18
