@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from services.technical_analysis import TechnicalAnalysisService
 from services.prediction import PredictionService
-from services.news import NewsService
+from services.news_service import NewsService
 from plotly.subplots import make_subplots
 import requests
 from PIL import Image
