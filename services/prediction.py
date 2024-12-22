@@ -206,6 +206,7 @@ class PredictionService:
         """Make predictions with confidence intervals"""
         try:
             if symbol not in self.models:
+                print(f"No trained models found for {symbol}")
                 return None
             
             # Get latest data
@@ -213,46 +214,96 @@ class PredictionService:
             df = stock.history(period="60d")
             
             if df.empty:
+                print(f"No historical data available for {symbol}")
                 return None
             
             # Prepare features
-            df['MA5'] = df['Close'].rolling(window=5).mean()
-            df['MA20'] = df['Close'].rolling(window=20).mean()
-            df['RSI'] = self._calculate_rsi(df['Close'])
-            df['Volume_MA'] = df['Volume'].rolling(window=5).mean()
-            df['Returns'] = df['Close'].pct_change()
-            df['Volatility'] = df['Returns'].rolling(window=20).std()
-            
-            features = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                       'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
-            
-            X = df[features].iloc[-1:].values
-            X_scaled = self.scalers[symbol].transform(X)
-            
-            predictions = {}
-            confidence_intervals = {}
-            
-            # Make predictions with each model
-            for model_name, model in self.models[symbol].items():
-                if model_name == 'rf':
-                    # Random Forest prediction with confidence interval
-                    predictions_array = np.array([tree.predict(X_scaled) for tree in model.estimators_])
-                    pred = predictions_array.mean()
-                    conf_interval = stats.t.interval(0.95, len(predictions_array)-1,
-                                                   loc=pred,
-                                                   scale=stats.sem(predictions_array))
-                elif model_name == 'nn':
-                    # Neural Network prediction
-                    pred = model.predict(X_scaled).flatten()[0]
-                    # Estimate confidence interval using prediction std
-                    std = np.std([model.predict(X_scaled) for _ in range(100)])
-                    conf_interval = (pred - 1.96*std, pred + 1.96*std)
+            try:
+                df['MA5'] = df['Close'].rolling(window=5).mean()
+                df['MA20'] = df['Close'].rolling(window=20).mean()
+                df['RSI'] = self._calculate_rsi(df['Close'])
+                df['Volume_MA'] = df['Volume'].rolling(window=5).mean()
+                df['Returns'] = df['Close'].pct_change()
+                df['Volatility'] = df['Returns'].rolling(window=20).std()
                 
-                predictions[model_name] = pred
-                confidence_intervals[model_name] = conf_interval
-            
-            self.confidence_intervals[symbol] = confidence_intervals
-            return predictions
+                features = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                           'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
+                
+                # Check if all features are available
+                if not all(feature in df.columns for feature in features):
+                    print(f"Missing required features for {symbol}")
+                    return None
+                
+                # Get the last complete row
+                last_complete_row = df.dropna().iloc[-1:]
+                if last_complete_row.empty:
+                    print(f"No complete data available for {symbol}")
+                    return None
+                
+                X = last_complete_row[features].values
+                
+                # Scale the features using the same scale as training
+                scaler = self.scalers.get(symbol)
+                if scaler is None:
+                    print(f"No scaler found for {symbol}")
+                    return None
+                
+                # Get the scaling parameters
+                scale_params = {}
+                for i, feature in enumerate(features):
+                    scale_params[feature] = {
+                        'min': scaler.data_min_[i],
+                        'max': scaler.data_max_[i]
+                    }
+                
+                # Apply scaling manually to ensure consistency
+                X_scaled = np.zeros_like(X)
+                for i, feature in enumerate(features):
+                    min_val = scale_params[feature]['min']
+                    max_val = scale_params[feature]['max']
+                    if max_val - min_val > 0:  # Avoid division by zero
+                        X_scaled[0, i] = (X[0, i] - min_val) / (max_val - min_val)
+                    else:
+                        X_scaled[0, i] = 0  # Default to 0 if no variation in feature
+                
+                predictions = {}
+                confidence_intervals = {}
+                
+                # Make predictions with each model
+                for model_name, model in self.models[symbol].items():
+                    try:
+                        if model_name == 'rf':
+                            # Random Forest prediction with confidence interval
+                            predictions_array = np.array([tree.predict(X_scaled) for tree in model.estimators_])
+                            pred = predictions_array.mean()
+                            conf_interval = stats.t.interval(0.95, len(predictions_array)-1,
+                                                           loc=pred,
+                                                           scale=stats.sem(predictions_array))
+                        elif model_name == 'nn':
+                            # Neural Network prediction
+                            pred = model.predict(X_scaled).flatten()[0]
+                            # Estimate confidence interval using prediction std
+                            predictions_array = np.array([model.predict(X_scaled).flatten()[0] for _ in range(100)])
+                            conf_interval = stats.t.interval(0.95, len(predictions_array)-1,
+                                                           loc=pred,
+                                                           scale=stats.sem(predictions_array))
+                        
+                        predictions[model_name] = pred
+                        confidence_intervals[model_name] = conf_interval
+                    except Exception as e:
+                        print(f"Error making prediction with {model_name}: {str(e)}")
+                        continue
+                
+                if not predictions:
+                    print("No successful predictions made")
+                    return None
+                
+                self.confidence_intervals[symbol] = confidence_intervals
+                return predictions
+                
+            except Exception as e:
+                print(f"Error preparing features: {str(e)}")
+                return None
             
         except Exception as e:
             print(f"Error making predictions: {str(e)}")
