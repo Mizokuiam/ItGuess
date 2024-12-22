@@ -248,6 +248,19 @@ def get_company_info(symbol):
     except:
         return None
 
+def display_company_logo(info):
+    """Display company logo if available"""
+    try:
+        if 'logo_url' in info and info['logo_url']:
+            response = requests.get(info['logo_url'])
+            if response.status_code == 200:
+                image = Image.open(BytesIO(response.content))
+                st.image(image, width=100)
+            else:
+                print(f"Failed to fetch logo: {response.status_code}")
+    except Exception as e:
+        print(f"Error displaying logo: {str(e)}")
+
 # Initialize services
 def get_services():
     """Initialize all services"""
@@ -371,7 +384,19 @@ if symbol:
         tabs = st.tabs(tab_names)
 
         with tabs[0]:  # Overview Tab
-            with st.container():
+            try:
+                if info is not None:
+                    col1, col2 = st.columns([1, 3])
+                    
+                    with col1:
+                        # Display company logo
+                        display_company_logo(info)
+                    
+                    with col2:
+                        # Display company name as title
+                        st.markdown(f"<h1 class='gradient-text'>{info.get('longName', symbol)}</h1>", unsafe_allow_html=True)
+                        st.markdown(f"<p><strong>Sector:</strong> {info.get('sector', 'N/A')} | <strong>Industry:</strong> {info.get('industry', 'N/A')}</p>", unsafe_allow_html=True)
+                
                 # Quick Stats in first row
                 st.subheader("Quick Stats")
                 try:
