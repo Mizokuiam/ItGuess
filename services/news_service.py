@@ -105,28 +105,38 @@ class NewsService:
             return pd.DataFrame()
     
     def _get_newsapi_articles(self, company_name):
-        """Get articles from NewsAPI"""
+        """Get recent articles from NewsAPI"""
         try:
+            # Get news from the last 7 days to focus on recent news
             response = self.newsapi.get_everything(
                 q=company_name,
                 language='en',
-                sort_by='publishedAt',
-                from_param=(datetime.now() - timedelta(days=30)).date().isoformat(),
-                to=datetime.now().date().isoformat()
+                sort_by='relevancy',  # Changed to relevancy for better results
+                from_param=(datetime.now() - timedelta(days=7)).date().isoformat(),
+                to=datetime.now().date().isoformat(),
+                page_size=20  # Limit to 20 most relevant articles
             )
-            return response.get('articles', [])
+            articles = response.get('articles', [])
+            # Sort by date to get most recent first
+            articles.sort(key=lambda x: x.get('publishedAt', ''), reverse=True)
+            return articles[:10]  # Return top 10 most recent articles
         except Exception as e:
             print(f"Error fetching NewsAPI articles: {str(e)}")
             return []
     
     def _get_finnhub_articles(self, symbol):
-        """Get articles from Finnhub"""
+        """Get recent articles from Finnhub"""
         try:
             end_date = int(datetime.now().timestamp())
-            start_date = int((datetime.now() - timedelta(days=30)).timestamp())
+            # Get news from the last 7 days
+            start_date = int((datetime.now() - timedelta(days=7)).timestamp())
             
             news = self.finnhub_client.company_news(symbol, _from=start_date, to=end_date)
-            return news if news else []
+            if news:
+                # Sort by datetime and get most recent articles
+                news.sort(key=lambda x: x.get('datetime', 0), reverse=True)
+                return news[:10]  # Return top 10 most recent articles
+            return []
         except Exception as e:
             print(f"Error fetching Finnhub news: {str(e)}")
             return []

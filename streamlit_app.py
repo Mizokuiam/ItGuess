@@ -728,73 +728,82 @@ if symbol:
                     traceback.print_exc()
 
         with tabs[3]:  # News Sentiment Tab
-            st.subheader("News Sentiment Analysis")
+            st.subheader("Recent News & Sentiment Analysis")
             
             with st.spinner("Fetching latest news..."):
                 try:
-                    # Get company info for better news search
-                    info = stock.info
-                    company_name = info.get('longName', symbol)
+                    news_df = news_service.get_company_news(symbol, info.get('longName', symbol))
                     
-                    # Fetch news data
-                    news_data = news_service.get_company_news(symbol, company_name)
-                    
-                    if news_data is not None and not news_data.empty:
-                        # Display sentiment distribution
-                        sentiment_counts = news_data['sentiment_category'].value_counts()
+                    if news_df is not None and not news_df.empty:
+                        # Display news articles in a modern card layout
+                        st.markdown("""
+                            <style>
+                            .news-card {
+                                padding: 1rem;
+                                border-radius: 0.5rem;
+                                border: 1px solid #e0e0e0;
+                                margin-bottom: 1rem;
+                                background: white;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                            }
+                            .news-title {
+                                color: #1e88e5;
+                                font-size: 1.1rem;
+                                font-weight: 600;
+                                margin-bottom: 0.5rem;
+                            }
+                            .news-meta {
+                                color: #666;
+                                font-size: 0.9rem;
+                                margin-bottom: 0.5rem;
+                            }
+                            .sentiment-positive {
+                                color: #4caf50;
+                                font-weight: 600;
+                            }
+                            .sentiment-negative {
+                                color: #f44336;
+                                font-weight: 600;
+                            }
+                            .sentiment-neutral {
+                                color: #757575;
+                                font-weight: 600;
+                            }
+                            </style>
+                        """, unsafe_allow_html=True)
                         
-                        # Create pie chart
-                        fig = go.Figure(data=[go.Pie(
-                            labels=sentiment_counts.index,
-                            values=sentiment_counts.values,
-                            hole=0.3,
-                            marker_colors=['#28a745', '#6c757d', '#dc3545']  # Green for positive, grey for neutral, red for negative
-                        )])
+                        # Show total number of articles
+                        st.markdown(f"### Found {len(news_df)} Recent News Articles")
                         
-                        fig.update_layout(
-                            title="Sentiment Distribution",
-                            showlegend=True,
-                            legend=dict(orientation="h"),
-                            margin=dict(t=30, b=0, l=0, r=0)
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Display news with sentiment
-                        for _, row in news_data.iterrows():
-                            try:
-                                with st.container():
-                                    sentiment_color = "#28a745" if row['sentiment'] > 0.2 else "#dc3545" if row['sentiment'] < -0.2 else "#6c757d"
-                                    
-                                    # Format date
-                                    try:
-                                        date_str = row['date'].strftime('%Y-%m-%d %H:%M')
-                                    except:
-                                        date_str = 'Date not available'
-                                    
-                                    st.markdown(f"""
-                                    <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
-                                        <div style='border-left: 4px solid {sentiment_color}; padding-left: 10px;'>
-                                            <h4 style='margin: 0; color: #333;'>{row['title']}</h4>
-                                            <p style='margin: 10px 0; color: #666;'>{row.get('summary', 'No summary available')}</p>
-                                            <div style='display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 0.9em;'>
-                                                <div>
-                                                    <span>{date_str}</span>
-                                                    <span style='margin-left: 10px;'>Source: {row.get('source', 'Unknown')}</span>
-                                                </div>
-                                                <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>
-                                            </div>
-                                            <div style='margin-top: 10px;'>
-                                                <a href='{row['url']}' target='_blank' style='color: #007bff; text-decoration: none;'>Read more →</a>
-                                            </div>
-                                        </div>
+                        # Display each news article
+                        for _, article in news_df.iterrows():
+                            sentiment_class = {
+                                'Positive': 'sentiment-positive',
+                                'Negative': 'sentiment-negative',
+                                'Neutral': 'sentiment-neutral'
+                            }.get(article['sentiment_category'], 'sentiment-neutral')
+                            
+                            st.markdown(f"""
+                                <div class="news-card">
+                                    <div class="news-title">
+                                        <a href="{article['url']}" target="_blank">{article['title']}</a>
                                     </div>
-                                    """, unsafe_allow_html=True)
-                            except Exception as e:
-                                print(f"Error displaying article: {str(e)}")
-                                continue
+                                    <div class="news-meta">
+                                        Source: {article['source']} | 
+                                        Sentiment: <span class="{sentiment_class}">{article['sentiment_category']}</span>
+                                    </div>
+                                    <div>{article['summary']}</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Show sentiment distribution in a small chart
+                        st.markdown("### Sentiment Distribution")
+                        sentiment_counts = news_df['sentiment_category'].value_counts()
+                        st.bar_chart(sentiment_counts)
+                        
                     else:
-                        st.info("No recent news available. Please check back later.")
+                        st.info("No recent news articles found for this company.")
+                        
                 except Exception as e:
                     st.error(f"Error fetching news: {str(e)}")
                     
