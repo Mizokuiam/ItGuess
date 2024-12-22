@@ -15,7 +15,7 @@ from io import BytesIO
 # Page config
 st.set_page_config(
     page_title="ItGuess - Stock Price Predictor",
-    page_icon="🎯",
+    page_icon="♾️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
