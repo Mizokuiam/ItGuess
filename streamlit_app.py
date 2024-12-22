@@ -318,9 +318,11 @@ if symbol:
                         indicators = ta_service.calculate_indicators()
                         
                         # Create figure with secondary y-axis
-                        fig = make_subplots(rows=2, cols=1, shared_xaxis=True, 
+                        fig = make_subplots(rows=2, cols=1, 
+                                          shared_xaxes=True,  
                                           vertical_spacing=0.03, 
-                                          row_heights=[0.7, 0.3])
+                                          row_heights=[0.7, 0.3],
+                                          subplot_titles=('Price', 'RSI'))
 
                         # Add candlestick
                         fig.add_trace(go.Candlestick(x=hist.index,
@@ -329,6 +331,17 @@ if symbol:
                                                     low=hist['Low'],
                                                     close=hist['Close'],
                                                     name='OHLC'),
+                                    row=1, col=1)
+
+                        # Add Volume as bar chart
+                        colors = ['red' if row['Open'] - row['Close'] >= 0 
+                                else 'green' for index, row in hist.iterrows()]
+                        
+                        fig.add_trace(go.Bar(x=hist.index, 
+                                           y=hist['Volume'],
+                                           name='Volume',
+                                           marker_color=colors,
+                                           opacity=0.3),
                                     row=1, col=1)
 
                         # Add RSI
@@ -340,17 +353,32 @@ if symbol:
                                         row=2, col=1)
                             
                             # Add RSI reference lines
-                            fig.add_hline(y=70, line_width=1, line_dash="dash", line_color="red", row=2, col=1)
-                            fig.add_hline(y=30, line_width=1, line_dash="dash", line_color="green", row=2, col=1)
+                            fig.add_hline(y=70, line_width=1, line_dash="dash", line_color="red", 
+                                        row=2, col=1)
+                            fig.add_hline(y=30, line_width=1, line_dash="dash", line_color="green", 
+                                        row=2, col=1)
 
                         # Update layout
                         fig.update_layout(
                             title=f'{symbol} Live Chart',
                             yaxis_title='Price',
-                            yaxis2_title='RSI',
+                            yaxis2_title='Volume',
+                            yaxis3_title='RSI',
                             xaxis_rangeslider_visible=False,
-                            height=800
+                            height=800,
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1
+                            )
                         )
+
+                        # Update y-axes
+                        fig.update_yaxes(title_text="Price", row=1, col=1)
+                        fig.update_yaxes(title_text="RSI", row=2, col=1)
 
                         # Display the chart
                         st.plotly_chart(fig, use_container_width=True)

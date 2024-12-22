@@ -34,18 +34,18 @@ class TechnicalAnalysisService:
             # Create a copy of the data to avoid modifying the original
             df = self.data.copy()
 
-            # Calculate RSI with current rsi_period from streamlit
-            rsi = self.calculate_rsi(df['Close'].values, period=14)
+            # Calculate RSI with current rsi_period
+            rsi = self.calculate_rsi(period=14)
             
             # Calculate MACD
-            macd, signal = self.calculate_macd(df['Close'], fast=12, slow=26, signal=9)
+            macd = ta.macd(df['Close'])
             
             # Calculate EMAs
-            ema_20 = self.calculate_ema(df['Close'], window=20)
-            ema_50 = self.calculate_ema(df['Close'], window=50)
+            ema20 = ta.ema(df['Close'], length=20)
+            ema50 = ta.ema(df['Close'], length=50)
             
             # Calculate Bollinger Bands
-            bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(df['Close'], window=20)
+            bb = ta.bbands(df['Close'], length=20)
 
             # Get the latest values and handle NaN values
             result = {}
@@ -63,13 +63,13 @@ class TechnicalAnalysisService:
 
             # Add indicators to result dict
             result['RSI'] = get_latest_value(rsi)
-            result['MACD'] = get_latest_value(macd)
-            result['Signal'] = get_latest_value(signal)
-            result['EMA20'] = get_latest_value(ema_20)
-            result['EMA50'] = get_latest_value(ema_50)
-            result['BB_Upper'] = get_latest_value(bb_upper)
-            result['BB_Middle'] = get_latest_value(bb_middle)
-            result['BB_Lower'] = get_latest_value(bb_lower)
+            result['MACD'] = get_latest_value(macd['MACD_12_26_9'])
+            result['Signal'] = get_latest_value(macd['MACDs_12_26_9'])
+            result['EMA20'] = get_latest_value(ema20)
+            result['EMA50'] = get_latest_value(ema50)
+            result['BB_Upper'] = get_latest_value(bb['BBU_20_2.0'])
+            result['BB_Middle'] = get_latest_value(bb['BBM_20_2.0'])
+            result['BB_Lower'] = get_latest_value(bb['BBL_20_2.0'])
             result['Volume'] = get_latest_value(df['Volume'])
 
             # Round numeric values
