@@ -312,7 +312,7 @@ with st.sidebar:
     
     # Search box with improved styling
     st.markdown("<div class='search-container'>", unsafe_allow_html=True)
-    symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT")
+    symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
     st.markdown("</div>", unsafe_allow_html=True)
 
     # Analysis settings
@@ -335,24 +335,7 @@ with st.sidebar:
             st.rerun()
 
 # Main content
-if symbol == "":  # Show welcome page when no symbol is entered
-    # Hide default elements
-    st.markdown("""
-        <style>
-            .stMarkdown {display: none;}
-            .stMarkdown:first-of-type {display: block;}
-            
-            /* Sidebar styling */
-            .css-1d391kg {
-                padding-top: 1rem;
-            }
-            
-            .css-1d391kg h1 {
-                margin-bottom: 0.5rem;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-    
+if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol is entered
     # Title and subtitle
     st.markdown('<h1 class="app-title">ItGuess</h1>', unsafe_allow_html=True)
     st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
@@ -366,7 +349,7 @@ if symbol == "":  # Show welcome page when no symbol is entered
     
     # Feature cards
     st.markdown("""
-        <div class="features-container" style="margin-top: 50px;">
+        <div class="features-container">
             <div class="feature-card">
                 <span class="feature-icon">🎯</span>
                 <h3 class="feature-title">Technical Analysis</h3>
