@@ -109,71 +109,45 @@ st.markdown("""
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 30px;
-        padding: 40px;
-        max-width: 1200px;
-        margin: 0 auto;
+        padding: 20px;
+        max-width: 1400px;
+        margin: 30px auto;
     }
     
     .feature-card {
         background: var(--card-background);
-        border-radius: 20px;
-        padding: 35px;
-        text-align: center;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 15px;
+        padding: 30px;
+        text-align: left;
+        transition: all 0.3s ease;
         border: 2px solid var(--border-color);
-        position: relative;
-        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
     .feature-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
         border-color: var(--gradient-start);
     }
     
-    .feature-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
-        transform: scaleX(0);
-        transition: transform 0.3s ease;
-    }
-    
-    .feature-card:hover::before {
-        transform: scaleX(1);
-    }
-    
     .feature-icon {
-        font-size: 3.5em;
-        margin-bottom: 25px;
-        display: block;
-        transition: transform 0.3s ease;
-    }
-    
-    .feature-card:hover .feature-icon {
-        transform: scale(1.1);
+        font-size: 2.5em;
+        margin-bottom: 15px;
+        display: inline-block;
     }
     
     .feature-title {
-        font-size: 1.6em;
-        font-weight: 700;
-        margin-bottom: 20px;
+        font-size: 1.4em;
+        font-weight: 600;
+        margin: 10px 0;
         color: var(--text-color);
-        position: relative;
-        display: inline-block;
     }
     
     .feature-description {
         color: var(--text-color);
-        line-height: 1.7;
-        font-size: 1.1em;
+        line-height: 1.6;
+        font-size: 1em;
         opacity: 0.9;
-        margin: 0 auto;
-        max-width: 90%;
     }
     
     /* Search box with improved styling */
@@ -589,7 +563,7 @@ elif symbol:  # Show stock analysis when symbol is entered
                     signal_text = "Buy" if buy_signals > sell_signals else "Sell"
                     
                     st.markdown(f"""
-                    <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+                    <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);'>
                         <h2 style='color: {signal_color};'>{signal_text}</h2>
                         <p style='color: #666;'>↑ {buy_signals} Buy vs ↓ {sell_signals} Sell signals</p>
                     </div>
