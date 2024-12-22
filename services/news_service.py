@@ -7,8 +7,8 @@ import finnhub
 
 class NewsService:
     def __init__(self):
-        self.newsapi = NewsApiClient(api_key=os.getenv('NEWS_API_KEY', 'your-news-api-key'))
-        self.finnhub_client = finnhub.Client(api_key=os.getenv('FINNHUB_API_KEY', 'your-finnhub-api-key'))
+        self.newsapi = NewsApiClient(api_key='168ee0f418f14fcf8f88cdd1b6bf5963')
+        self.finnhub_client = finnhub.Client(api_key='ctjutipr01quipmv6v3gctjutipr01quipmv6v40')
         
     def get_company_news(self, symbol, company_name):
         """Get news articles for a company"""
