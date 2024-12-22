@@ -312,16 +312,16 @@ class PredictionService:
             
             # Train Neural Network
             print("\nTraining Neural Network...")
-            nn_model = tf.keras.Sequential([
-                tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-                tf.keras.layers.BatchNormalization(),
-                tf.keras.layers.Dropout(0.2),
-                tf.keras.layers.Dense(32, activation='relu'),
-                tf.keras.layers.BatchNormalization(),
-                tf.keras.layers.Dropout(0.1),
-                tf.keras.layers.Dense(1)
-            ])
+            inputs = tf.keras.Input(shape=(X_train.shape[1],))
+            x = tf.keras.layers.Dense(64, activation='relu')(inputs)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Dropout(0.2)(x)
+            x = tf.keras.layers.Dense(32, activation='relu')(x)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Dropout(0.1)(x)
+            outputs = tf.keras.layers.Dense(1)(x)
             
+            nn_model = tf.keras.Model(inputs=inputs, outputs=outputs)
             nn_model.compile(optimizer='adam', loss='mse')
             nn_model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=0)
             nn_pred = nn_model.predict(X_test, verbose=0).flatten()
