@@ -386,13 +386,24 @@ class PredictionService:
             
             # Fetch historical data
             stock = yf.Ticker(symbol)
-            df = stock.history(period="60d")
+            df = stock.history(period="3mo")  # Fetch 3 months of data
+            
+            print(f"Initial data fetch: {len(df)} days")
+            print(f"Date range: {df.index[0]} to {df.index[-1]}")
+            
+            # Filter to last 60 days
+            df = df.last('60D')
+            print(f"After filtering: {len(df)} days")
             
             if df.empty:
                 print("No data available")
                 return None
                 
-            print(f"Fetched {len(df)} days of data")
+            if len(df) < 20:
+                print(f"Insufficient data: only {len(df)} days available")
+                return None
+                
+            print(f"Using {len(df)} days of data")
             print("Data columns:", df.columns.tolist())
             
             current_price = float(df['Close'].iloc[-1])

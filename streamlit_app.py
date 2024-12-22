@@ -603,15 +603,26 @@ if symbol:
         with tabs[2]:  # Price Prediction Tab
             with st.spinner("Analyzing technical indicators..."):
                 try:
-                    # Verify we have enough data
+                    # Fetch more data than needed to ensure we have enough
                     stock = yf.Ticker(symbol)
-                    hist = stock.history(period="60d")
-                    if len(hist) < 20:  # Need at least 20 days for technical analysis
-                        st.error(f"Insufficient historical data for {symbol}. Need at least 20 days of trading data.")
+                    hist = stock.history(period="3mo")  # Fetch 3 months instead of 60 days
+                    
+                    print(f"\nFetching data for {symbol}")
+                    print(f"Data shape: {hist.shape}")
+                    print(f"Date range: {hist.index[0]} to {hist.index[-1]}")
+                    
+                    # Filter to last 60 days if we have more
+                    hist = hist.last('60D')
+                    
+                    if len(hist) < 20:
+                        st.error(f"Insufficient historical data for {symbol}. Found {len(hist)} days, need at least 20 days of trading data.")
+                        print(f"Available data points: {len(hist)}")
+                        print(f"Date range after filtering: {hist.index[0]} to {hist.index[-1]}")
                         st.stop()
                     
                     print(f"\nMaking prediction for {symbol}")
-                    print(f"Historical data available: {len(hist)} days")
+                    print(f"Using {len(hist)} days of historical data")
+                    print(f"Data columns: {hist.columns.tolist()}")
                     
                     predictions = prediction_service.predict(symbol)
                     if predictions is None:
