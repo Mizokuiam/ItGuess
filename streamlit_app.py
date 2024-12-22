@@ -203,11 +203,14 @@ def get_company_info(symbol):
         return None
 
 # Initialize services
-@st.cache_resource
 def get_services():
     return TechnicalAnalysisService(), PredictionService(), NewsService()
 
-technical_analysis, prediction_service, news_service = get_services()
+if 'services' not in st.session_state:
+    st.session_state.services = get_services()
+    st.session_state.last_update = datetime.now()
+
+technical_analysis, prediction_service, news_service = st.session_state.services
 
 # Sidebar
 with st.sidebar:
@@ -572,126 +575,113 @@ if symbol:
         
         with tabs[2]:  # Price Prediction Tab
             with st.spinner("Training prediction models..."):
-                # Train models if needed
-                if prediction_service.train_models(symbol):
-                    predictions = prediction_service.predict(symbol)
-                    confidence_intervals = prediction_service.get_confidence_intervals(symbol)
-                    feature_importance = prediction_service.get_feature_importance(symbol)
-                    prediction_history = prediction_service.get_prediction_history(symbol)
-                    
-                    if predictions and confidence_intervals:
-                        st.subheader("Price Predictions")
-                        
-                        # Create columns for each model's prediction
-                        rf_col, nn_col = st.columns(2)
-                        
-                        with rf_col:
-                            st.markdown("##### Random Forest Model")
-                            rf_pred = predictions['rf']
-                            rf_ci = confidence_intervals['rf']
+                try:
+                    # Train models if needed
+                    if prediction_service.train_models(symbol):
+                        try:
+                            predictions = prediction_service.predict(symbol)
+                            confidence_intervals = prediction_service.get_confidence_intervals(symbol)
+                            feature_importance = prediction_service.get_feature_importance(symbol)
+                            prediction_history = prediction_service.get_prediction_history(symbol)
                             
-                            # Display prediction with confidence interval
-                            st.metric(
-                                "Predicted Price",
-                                f"${rf_pred:.2f}",
-                                delta=f"CI: ${rf_ci[0]:.2f} to ${rf_ci[1]:.2f}"
-                            )
-                            
-                            # Feature importance plot
-                            if feature_importance:
-                                fig = go.Figure(go.Bar(
-                                    x=list(feature_importance.values()),
-                                    y=list(feature_importance.keys()),
-                                    orientation='h'
-                                ))
-                                fig.update_layout(
-                                    title="Feature Importance",
-                                    height=300,
-                                    margin=dict(l=0, r=0, t=30, b=0)
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
-                        
-                        with nn_col:
-                            st.markdown("##### Neural Network Model")
-                            nn_pred = predictions['nn']
-                            nn_ci = confidence_intervals['nn']
-                            
-                            # Display prediction with confidence interval
-                            st.metric(
-                                "Predicted Price",
-                                f"${nn_pred:.2f}",
-                                delta=f"CI: ${nn_ci[0]:.2f} to ${nn_ci[1]:.2f}"
-                            )
-                            
-                            # Model performance metrics
-                            metrics = prediction_service.metrics.get(symbol, {}).get('nn', {})
-                            if metrics:
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.metric("RMSE", f"${metrics['rmse']:.2f}")
-                                with col2:
-                                    st.metric("R² Score", f"{metrics['r2']:.3f}")
-                        
-                        # Prediction History
-                        if prediction_history:
-                            st.subheader("Prediction History")
-                            
-                            # Create prediction history plot
-                            fig = go.Figure()
-                            
-                            # Actual prices
-                            fig.add_trace(go.Scatter(
-                                y=prediction_history['actual'],
-                                name='Actual Price',
-                                line=dict(color='black')
-                            ))
-                            
-                            # RF predictions
-                            fig.add_trace(go.Scatter(
-                                y=prediction_history['rf_pred'],
-                                name='RF Predictions',
-                                line=dict(color='blue', dash='dash')
-                            ))
-                            
-                            # NN predictions
-                            fig.add_trace(go.Scatter(
-                                y=prediction_history['nn_pred'],
-                                name='NN Predictions',
-                                line=dict(color='red', dash='dash')
-                            ))
-                            
-                            fig.update_layout(
-                                title="Model Predictions vs Actual Prices",
-                                xaxis_title="Time",
-                                yaxis_title="Price",
-                                height=400,
-                                template='plotly_white'
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Prediction Accuracy Metrics
-                            st.subheader("Model Performance")
-                            metrics = prediction_service.metrics.get(symbol, {})
-                            
-                            if metrics:
-                                col1, col2 = st.columns(2)
+                            if predictions and confidence_intervals:
+                                st.subheader("Price Predictions")
                                 
-                                with col1:
-                                    st.markdown("##### Random Forest Metrics")
-                                    rf_metrics = metrics.get('rf', {})
-                                    st.metric("RMSE", f"${rf_metrics.get('rmse', 0):.2f}")
-                                    st.metric("R² Score", f"{rf_metrics.get('r2', 0):.3f}")
+                                # Create columns for each model's prediction
+                                rf_col, nn_col = st.columns(2)
                                 
-                                with col2:
-                                    st.markdown("##### Neural Network Metrics")
-                                    nn_metrics = metrics.get('nn', {})
-                                    st.metric("RMSE", f"${nn_metrics.get('rmse', 0):.2f}")
-                                    st.metric("R² Score", f"{nn_metrics.get('r2', 0):.3f}")
+                                with rf_col:
+                                    st.markdown("### Random Forest Model")
+                                    current_price = stock.history(period="1d")['Close'].iloc[-1]
+                                    predicted_price = predictions['rf']
+                                    price_change = ((predicted_price - current_price) / current_price) * 100
+                                    
+                                    st.metric(
+                                        "Predicted Price",
+                                        f"${predicted_price:.2f}",
+                                        f"{price_change:+.2f}%",
+                                        delta_color="normal"
+                                    )
+                                    
+                                    ci = confidence_intervals['rf']
+                                    st.write(f"Confidence Interval: ${ci[0]:.2f} to ${ci[1]:.2f}")
+                                
+                                with nn_col:
+                                    st.markdown("### Neural Network Model")
+                                    predicted_price = predictions['nn']
+                                    price_change = ((predicted_price - current_price) / current_price) * 100
+                                    
+                                    st.metric(
+                                        "Predicted Price",
+                                        f"${predicted_price:.2f}",
+                                        f"{price_change:+.2f}%",
+                                        delta_color="normal"
+                                    )
+                                    
+                                    ci = confidence_intervals['nn']
+                                    st.write(f"Confidence Interval: ${ci[0]:.2f} to ${ci[1]:.2f}")
+                                
+                                # Show feature importance
+                                if feature_importance:
+                                    st.subheader("Feature Importance")
+                                    importance_df = pd.DataFrame({
+                                        'Feature': feature_importance.keys(),
+                                        'Importance': feature_importance.values()
+                                    }).sort_values('Importance', ascending=False)
+                                    
+                                    fig = go.Figure(go.Bar(
+                                        x=importance_df['Feature'],
+                                        y=importance_df['Importance'],
+                                        marker_color='rgba(126, 86, 218, 0.7)'
+                                    ))
+                                    fig.update_layout(
+                                        title="Feature Importance in Prediction",
+                                        xaxis_title="Features",
+                                        yaxis_title="Importance Score",
+                                        showlegend=False
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Show prediction history
+                                if prediction_history:
+                                    st.subheader("Model Performance History")
+                                    history_df = pd.DataFrame({
+                                        'Actual': prediction_history['actual'],
+                                        'Random Forest': prediction_history['rf_pred'],
+                                        'Neural Network': prediction_history['nn_pred']
+                                    })
+                                    
+                                    fig = go.Figure()
+                                    fig.add_trace(go.Scatter(
+                                        y=history_df['Actual'],
+                                        name='Actual Price',
+                                        line=dict(color='black', width=2)
+                                    ))
+                                    fig.add_trace(go.Scatter(
+                                        y=history_df['Random Forest'],
+                                        name='Random Forest Prediction',
+                                        line=dict(color='blue')
+                                    ))
+                                    fig.add_trace(go.Scatter(
+                                        y=history_df['Neural Network'],
+                                        name='Neural Network Prediction',
+                                        line=dict(color='red')
+                                    ))
+                                    fig.update_layout(
+                                        title="Model Predictions vs Actual Prices",
+                                        xaxis_title="Time",
+                                        yaxis_title="Price",
+                                        hovermode='x unified'
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.error("Unable to generate predictions. Models trained but prediction failed.")
+                        except Exception as e:
+                            st.error(f"Error during prediction: {str(e)}")
                     else:
-                        st.error("Unable to generate predictions")
-                else:
-                    st.error("Unable to train prediction models")
+                        st.error("Unable to train prediction models. This could be due to insufficient data.")
+                except Exception as e:
+                    st.error(f"Error in prediction tab: {str(e)}")
         
         with tabs[3]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
