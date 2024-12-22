@@ -20,7 +20,7 @@ class TechnicalAnalysisService:
             while retry_count < max_retries:
                 try:
                     stock = yf.Ticker(symbol)
-                    self.data = stock.history(period="1y")
+                    self.data = stock.history(period="3mo")  # Fetch 3 months of data
                     break
                 except Exception as e:
                     retry_count += 1
@@ -28,7 +28,10 @@ class TechnicalAnalysisService:
                         print(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
                         return None
                     print(f"Retry {retry_count}/{max_retries} after error: {str(e)}")
-                    time.sleep(1)  # Wait 1 second before retrying
+                    time.sleep(1)
+            
+            # Filter to last 60 days
+            self.data = self.data.last('60D')
             
             # Validate data
             if self.data is None or self.data.empty:
@@ -42,54 +45,77 @@ class TechnicalAnalysisService:
                 return None
                 
             # Check for sufficient data points
-            if len(self.data) < 50:  # Need at least 50 points for calculations
+            if len(self.data) < 20:
                 print(f"Insufficient data points for symbol: {symbol}")
                 return None
-                
-            # Calculate all indicators
-            analysis = {}
             
-            # Calculate indicators one by one with error handling
+            # Calculate indicators
             try:
-                analysis['ma_cross'] = self._calculate_ma_cross()
-            except Exception as e:
-                print(f"Error calculating MA Cross: {str(e)}")
-                analysis['ma_cross'] = {'MA20': None, 'MA50': None, 'signal': 'Neutral'}
+                # MACD
+                exp1 = self.data['Close'].ewm(span=12, adjust=False).mean()
+                exp2 = self.data['Close'].ewm(span=26, adjust=False).mean()
+                macd = exp1 - exp2
+                signal_line = macd.ewm(span=9, adjust=False).mean()
                 
-            try:
-                analysis['macd'] = self._calculate_macd()
-            except Exception as e:
-                print(f"Error calculating MACD: {str(e)}")
-                analysis['macd'] = {'MACD': None, 'Signal': None, 'signal': 'Neutral'}
+                current_macd = float(macd.iloc[-1])
+                current_signal = float(signal_line.iloc[-1])
+                macd_interp = "Buy" if current_macd > current_signal else "Sell"
                 
-            try:
-                analysis['rsi'] = self._calculate_rsi()
-            except Exception as e:
-                print(f"Error calculating RSI: {str(e)}")
-                analysis['rsi'] = {'RSI': None, 'signal': 'Neutral'}
+                macd_data = {
+                    'macd': current_macd,
+                    'signal': current_signal,
+                    'interpretation': macd_interp
+                }
                 
-            try:
-                analysis['stochastic'] = self._calculate_stochastic()
-            except Exception as e:
-                print(f"Error calculating Stochastic: {str(e)}")
-                analysis['stochastic'] = {'K': None, 'D': None, 'signal': 'Neutral'}
+                # Stochastic
+                k_period = 14
+                d_period = 3
                 
-            try:
-                analysis['obv'] = self._calculate_obv()
-            except Exception as e:
-                print(f"Error calculating OBV: {str(e)}")
-                analysis['obv'] = {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
+                low_min = self.data['Low'].rolling(window=k_period).min()
+                high_max = self.data['High'].rolling(window=k_period).max()
                 
-            try:
-                analysis['volume'] = self._calculate_volume_analysis()
+                k = 100 * ((self.data['Close'] - low_min) / (high_max - low_min))
+                d = k.rolling(window=d_period).mean()
+                
+                current_k = float(k.iloc[-1])
+                current_d = float(d.iloc[-1])
+                
+                stoch_interp = "Buy" if current_k > current_d and current_k < 20 else "Sell" if current_k > 80 else "Neutral"
+                
+                stoch_data = {
+                    'k': current_k,
+                    'd': current_d,
+                    'interpretation': stoch_interp
+                }
+                
+                # Volume
+                volume = float(self.data['Volume'].iloc[-1])
+                volume_ma = float(self.data['Volume'].rolling(window=20).mean().iloc[-1])
+                volume_ratio = volume / volume_ma
+                
+                volume_interp = "Buy" if volume_ratio > 1.5 and self.data['Close'].iloc[-1] > self.data['Close'].iloc[-2] else "Sell" if volume_ratio > 1.5 else "Neutral"
+                
+                volume_data = {
+                    'volume': volume,
+                    'interpretation': volume_interp
+                }
+                
+                return {
+                    'macd': macd_data,
+                    'stochastic': stoch_data,
+                    'volume': volume_data
+                }
+                
             except Exception as e:
-                print(f"Error calculating Volume Analysis: {str(e)}")
-                analysis['volume'] = {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
-            
-            return analysis
+                print(f"Error calculating indicators: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return None
             
         except Exception as e:
             print(f"Error in technical analysis: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _calculate_ma_cross(self):
