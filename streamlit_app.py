@@ -13,7 +13,7 @@ from io import BytesIO
 
 # Configure Streamlit theme
 st.set_page_config(
-    page_title="ItGuess - Stock Analysis",
+    page_title="ItGuess - Smart Stock Analysis",
     page_icon="📈",
     layout="wide"
 )
@@ -29,6 +29,9 @@ st.markdown("""
         --border-color: #e0e0e0;
         --hover-color: #f0f0f0;
         --link-color: #1e88e5;
+        --gradient-start: #2196f3;
+        --gradient-mid: #00bcd4;
+        --gradient-end: #1976d2;
     }
     
     /* Dark mode styles */
@@ -39,12 +42,45 @@ st.markdown("""
         --border-color: #404040;
         --hover-color: #3d3d3d;
         --link-color: #64b5f6;
+        --gradient-start: #64b5f6;
+        --gradient-mid: #4fc3f7;
+        --gradient-end: #2196f3;
     }
     
     /* Common styles */
     .stApp {
         color: var(--text-color);
         background-color: var(--background-color);
+    }
+    
+    .app-title {
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 4em;
+        font-weight: 800;
+        text-align: center;
+        margin: 20px 0;
+        background: linear-gradient(120deg, var(--gradient-start), var(--gradient-mid), var(--gradient-end));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        letter-spacing: 3px;
+    }
+    
+    .app-subtitle {
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 1.2em;
+        text-align: center;
+        color: var(--text-color);
+        margin-bottom: 30px;
+        opacity: 0.8;
+    }
+    
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        padding: 20px;
+        margin-top: 30px;
     }
     
     .feature-box {
@@ -64,89 +100,38 @@ st.markdown("""
     .feature-icon {
         font-size: 2.5em;
         margin-bottom: 15px;
-        background: linear-gradient(120deg, #00ff88, #00bfff);
+        background: linear-gradient(120deg, var(--gradient-start), var(--gradient-end));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
     
-    .ai-title {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 4em;
-        font-weight: 800;
-        text-align: center;
-        margin: 20px 0;
-        background: linear-gradient(120deg, #00ff88, #00bfff, #7b68ee);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        letter-spacing: 3px;
-    }
-    
-    .ai-subtitle {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 1.2em;
-        text-align: center;
+    .feature-title {
         color: var(--text-color);
-        margin-bottom: 30px;
-        opacity: 0.8;
+        font-size: 1.3em;
+        font-weight: 600;
+        margin-bottom: 10px;
     }
     
-    .feature-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        padding: 20px;
-        margin-top: 30px;
+    .feature-desc {
+        color: var(--text-color);
+        font-size: 1em;
+        line-height: 1.5;
+        opacity: 0.9;
     }
     
-    /* Plotly chart customization */
-    .js-plotly-plot .plotly .modebar {
-        background-color: var(--card-background) !important;
-    }
-    
-    /* Table customization */
-    .dataframe {
-        background-color: var(--card-background);
+    .search-prompt {
+        text-align: center;
+        padding: 30px;
+        margin: 20px 0;
+        background: linear-gradient(145deg, var(--card-background), var(--hover-color));
+        border-radius: 15px;
         border: 1px solid var(--border-color);
     }
     
-    .dataframe th {
-        background-color: var(--hover-color);
+    .search-text {
+        font-size: 1.2em;
         color: var(--text-color);
-    }
-    
-    .dataframe td {
-        color: var(--text-color);
-    }
-    
-    /* Links */
-    a {
-        color: var(--link-color);
-        text-decoration: none;
-    }
-    
-    a:hover {
-        text-decoration: underline;
-    }
-    
-    /* Streamlit components */
-    .stSelectbox, .stTextInput {
-        background-color: var(--card-background);
-        color: var(--text-color);
-        border-color: var(--border-color);
-    }
-    
-    .stButton button {
-        background-color: var(--link-color);
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .stButton button:hover {
-        opacity: 0.9;
+        margin: 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -327,13 +312,13 @@ with st.sidebar:
 
 # Main content
 if not symbol:  # Show welcome page when no symbol is entered
-    st.markdown('<h1 class="ai-title">StockAI Insight</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="ai-subtitle">Advanced Stock Analysis & Prediction Platform Powered by AI</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="app-title">ItGuess</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
     
     # Search box with example
     st.markdown("""
-        <div style="text-align: center; padding: 20px;">
-            <p style="font-size: 1.2em; color: var(--text-color);">
+        <div class="search-prompt">
+            <p class="search-text">
                 Enter a stock symbol to begin (e.g., AAPL for Apple Inc.)
             </p>
         </div>
@@ -343,39 +328,21 @@ if not symbol:  # Show welcome page when no symbol is entered
     st.markdown("""
         <div class="feature-grid">
             <div class="feature-box">
-                <div class="feature-icon">🤖</div>
-                <div class="feature-title">AI-Powered Analysis</div>
-                <div class="feature-desc">Advanced machine learning algorithms for accurate stock predictions and trend analysis</div>
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Technical Analysis</div>
+                <div class="feature-desc">Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.</div>
             </div>
             
             <div class="feature-box">
-                <div class="feature-icon">📊</div>
-                <div class="feature-title">Technical Indicators</div>
-                <div class="feature-desc">Comprehensive technical analysis with MACD, RSI, and moving averages</div>
+                <div class="feature-icon">🤖</div>
+                <div class="feature-title">Price Prediction</div>
+                <div class="feature-desc">AI-powered price predictions based on technical analysis and market patterns.</div>
             </div>
             
             <div class="feature-box">
                 <div class="feature-icon">📈</div>
-                <div class="feature-title">Real-Time Charts</div>
-                <div class="feature-desc">Interactive live charts with customizable timeframes and indicators</div>
-            </div>
-            
-            <div class="feature-box">
-                <div class="feature-icon">🎯</div>
-                <div class="feature-title">Price Predictions</div>
-                <div class="feature-desc">Future price predictions using advanced neural networks and historical data</div>
-            </div>
-            
-            <div class="feature-box">
-                <div class="feature-icon">📱</div>
-                <div class="feature-title">Responsive Design</div>
-                <div class="feature-desc">Seamless experience across all devices with dark/light mode support</div>
-            </div>
-            
-            <div class="feature-box">
-                <div class="feature-icon">⚡</div>
-                <div class="feature-title">Real-Time Data</div>
-                <div class="feature-desc">Live market data and instant technical analysis updates</div>
+                <div class="feature-title">Live Charts</div>
+                <div class="feature-desc">Real-time interactive charts with customizable indicators and time periods.</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
