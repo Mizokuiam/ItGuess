@@ -204,13 +204,40 @@ def get_company_info(symbol):
 
 # Initialize services
 def get_services():
-    return TechnicalAnalysisService(), PredictionService(), NewsService()
+    print("\nInitializing services...")
+    try:
+        ta_service = TechnicalAnalysisService()
+        print("Technical Analysis Service initialized")
+        
+        pred_service = PredictionService()
+        print("Prediction Service initialized")
+        
+        news_service = NewsService()
+        print("News Service initialized")
+        
+        return ta_service, pred_service, news_service
+    except Exception as e:
+        print(f"Error initializing services: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None, None, None
 
-if 'services' not in st.session_state:
+# Initialize or refresh services
+current_time = datetime.now()
+if 'services' not in st.session_state or \
+   'last_service_refresh' not in st.session_state or \
+   (current_time - st.session_state.last_service_refresh).total_seconds() > 3600:  # Refresh every hour
+    print("\nRefreshing services...")
     st.session_state.services = get_services()
-    st.session_state.last_update = datetime.now()
+    st.session_state.last_service_refresh = current_time
+    st.session_state.last_update = current_time
 
 technical_analysis, prediction_service, news_service = st.session_state.services
+
+# Validate services
+if None in st.session_state.services:
+    st.error("Error initializing services. Please refresh the page.")
+    st.stop()
 
 # Sidebar
 with st.sidebar:
@@ -576,15 +603,31 @@ if symbol:
         with tabs[2]:  # Price Prediction Tab
             with st.spinner("Analyzing technical indicators..."):
                 try:
+                    # Verify we have enough data
+                    stock = yf.Ticker(symbol)
+                    hist = stock.history(period="60d")
+                    if len(hist) < 20:  # Need at least 20 days for technical analysis
+                        st.error(f"Insufficient historical data for {symbol}. Need at least 20 days of trading data.")
+                        st.stop()
+                    
+                    print(f"\nMaking prediction for {symbol}")
+                    print(f"Historical data available: {len(hist)} days")
+                    
                     predictions = prediction_service.predict(symbol)
+                    if predictions is None:
+                        st.error("Unable to generate predictions. Check the logs for details.")
+                        st.stop()
+                        
                     confidence_intervals = prediction_service.get_confidence_intervals(symbol)
+                    if confidence_intervals is None:
+                        st.error("Unable to calculate confidence intervals.")
+                        st.stop()
                     
                     if predictions and confidence_intervals:
                         st.subheader("Technical Analysis Prediction")
                         
                         # Get current price
-                        stock = yf.Ticker(symbol)
-                        current_price = stock.history(period="1d")['Close'].iloc[-1]
+                        current_price = hist['Close'].iloc[-1]
                         
                         # Display prediction
                         pred_price = predictions['technical']
@@ -643,6 +686,9 @@ if symbol:
                         st.error("Unable to generate predictions. This could be due to insufficient data or invalid technical indicators.")
                 except Exception as e:
                     st.error(f"Error during prediction: {str(e)}")
+                    print(f"Error details: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
         
         with tabs[3]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
