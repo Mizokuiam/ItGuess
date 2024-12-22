@@ -746,6 +746,12 @@ if symbol:
                                 with st.container():
                                     sentiment_color = "#28a745" if row['sentiment'] > 0.2 else "#dc3545" if row['sentiment'] < -0.2 else "#6c757d"
                                     
+                                    # Format date
+                                    try:
+                                        date_str = pd.to_datetime(row['date']).strftime('%Y-%m-%d %H:%M')
+                                    except:
+                                        date_str = 'Date not available'
+                                    
                                     st.markdown(f"""
                                     <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
                                         <div style='border-left: 4px solid {sentiment_color}; padding-left: 10px;'>
@@ -753,7 +759,7 @@ if symbol:
                                             <p style='margin: 10px 0; color: #666;'>{row.get('summary', 'No summary available')}</p>
                                             <div style='display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 0.9em;'>
                                                 <div>
-                                                    <span>{pd.to_datetime(row['date']).strftime('%Y-%m-%d %H:%M')}</span>
+                                                    <span>{date_str}</span>
                                                     <span style='margin-left: 10px;'>Source: {row['source']}</span>
                                                 </div>
                                                 <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>

@@ -34,8 +34,23 @@ class NewsService:
                 from_param=(datetime.now() - timedelta(days=30)).date().isoformat(),
                 to=datetime.now().date().isoformat()
             )
-            return response.get('articles', [])
-        except:
+            
+            # Convert NewsAPI response to standard format
+            articles = response.get('articles', [])
+            formatted_articles = []
+            
+            for article in articles:
+                formatted_articles.append({
+                    'title': article.get('title', ''),
+                    'summary': article.get('description', ''),
+                    'url': article.get('url', ''),
+                    'date': article.get('publishedAt', ''),
+                    'source': {'name': article.get('source', {}).get('name', 'NewsAPI')}
+                })
+            
+            return formatted_articles
+        except Exception as e:
+            print(f"Error fetching NewsAPI articles: {str(e)}")
             return []
             
     def _get_finnhub_articles(self, symbol):
@@ -49,11 +64,12 @@ class NewsService:
             # Convert Finnhub response to match NewsAPI format
             formatted_news = []
             for article in news:
+                timestamp = article.get('datetime', 0)
                 formatted_news.append({
                     'title': article.get('headline', ''),
                     'summary': article.get('summary', ''),
                     'url': article.get('url', ''),
-                    'publishedAt': datetime.fromtimestamp(article.get('datetime', 0)).isoformat(),
+                    'date': datetime.fromtimestamp(timestamp).isoformat() if timestamp else '',
                     'source': {'name': article.get('source', 'Finnhub')}
                 })
             return formatted_news
@@ -69,7 +85,7 @@ class NewsService:
             try:
                 # Extract text for sentiment analysis
                 title = article.get('title', '')
-                summary = article.get('summary', '') or article.get('description', '')
+                summary = article.get('summary', '')
                 
                 if not title and not summary:
                     continue
@@ -89,11 +105,21 @@ class NewsService:
                 else:
                     sentiment_category = "Neutral"
                 
+                # Ensure date is in ISO format
+                date = article.get('date', '')
+                if date:
+                    try:
+                        # Parse and standardize date format
+                        parsed_date = pd.to_datetime(date)
+                        date = parsed_date.isoformat()
+                    except:
+                        date = datetime.now().isoformat()
+                
                 processed_articles.append({
                     'title': title,
                     'summary': summary,
                     'url': article.get('url', ''),
-                    'date': article.get('publishedAt', ''),
+                    'date': date,
                     'source': article.get('source', {}).get('name', 'Unknown'),
                     'sentiment': sentiment,
                     'sentiment_category': sentiment_category
