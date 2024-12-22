@@ -341,8 +341,9 @@ with st.sidebar:
 # Main content
 if symbol:
     try:
-        # Validate symbol
+        # Validate symbol and get info
         stock = yf.Ticker(symbol)
+        info = stock.info  # Get info once at the start
         
         # Try to fetch some basic data first
         try:
@@ -352,16 +353,6 @@ if symbol:
                 st.stop()
         except Exception as e:
             st.error(f"Error fetching data for {symbol}: {str(e)}")
-            st.stop()
-            
-        # Now try to get company info
-        try:
-            info = stock.info
-            if not info:
-                st.error(f"No company information available for symbol: {symbol}")
-                st.stop()
-        except Exception as e:
-            st.error(f"Error fetching company info for {symbol}: {str(e)}")
             st.stop()
             
         # Load company info and logo
@@ -515,7 +506,7 @@ if symbol:
 
                 # Third row: News Sentiment
                 st.subheader("News Sentiment Analysis")
-                company_name = stock.info.get('longName', symbol)
+                company_name = info.get('longName', symbol)
                 news_df = news_service.get_company_news(symbol, company_name)
                 
                 if news_df is not None and not news_df.empty:
@@ -732,7 +723,9 @@ if symbol:
             
             with st.spinner("Fetching latest news..."):
                 try:
-                    news_df = news_service.get_company_news(symbol, info.get('longName', symbol))
+                    # Use the company name from info, fallback to symbol if not available
+                    company_name = info.get('longName', symbol) if info else symbol
+                    news_df = news_service.get_company_news(symbol, company_name)
                     
                     if news_df is not None and not news_df.empty:
                         # Display news articles in a modern card layout
