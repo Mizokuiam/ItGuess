@@ -129,19 +129,29 @@ class PredictionService:
     def train_models(self, symbol):
         """Train prediction models"""
         try:
+            print(f"\nTraining models for {symbol}...")
             X, y = self._prepare_data(symbol)
             
             if X is None or y is None:
+                print("Data preparation failed")
                 return False
+                
+            print(f"Training data shape: X={X.shape}, y={y.shape}")
+            print("Feature list:", self.features)
             
             # Split data
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
             # Train Random Forest
+            print("\nTraining Random Forest...")
             rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
             rf_model.fit(X_train, y_train)
+            rf_pred = rf_model.predict(X_test)
+            rf_score = r2_score(y_test, rf_pred)
+            print(f"Random Forest R2 Score: {rf_score:.4f}")
             
             # Train Neural Network
+            print("\nTraining Neural Network...")
             nn_model = tf.keras.Sequential([
                 tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
                 tf.keras.layers.BatchNormalization(),
@@ -154,6 +164,9 @@ class PredictionService:
             
             nn_model.compile(optimizer='adam', loss='mse')
             nn_model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=0)
+            nn_pred = nn_model.predict(X_test, verbose=0).flatten()
+            nn_score = r2_score(y_test, nn_pred)
+            print(f"Neural Network R2 Score: {nn_score:.4f}")
             
             # Store models
             self.models[symbol] = {
@@ -161,18 +174,15 @@ class PredictionService:
                 'nn': nn_model
             }
             
-            # Calculate metrics
-            self._calculate_metrics(symbol, X_test, y_test)
-            
-            # Store feature importance
-            self._calculate_feature_importance(symbol)
-            
+            print("\nModels trained successfully")
             return True
             
         except Exception as e:
             print(f"Error training models: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
-            
+
     def _calculate_metrics(self, symbol, X_test, y_test):
         """Calculate model performance metrics"""
         metrics = {}
@@ -212,19 +222,27 @@ class PredictionService:
     def predict(self, symbol, period='1d'):
         """Make predictions with confidence intervals"""
         try:
+            print(f"\nStarting prediction for {symbol}...")
+            
             if symbol not in self.models:
                 print(f"No trained models found for {symbol}")
                 return None
             
+            print("Models available:", list(self.models[symbol].keys()))
+            
             # Get latest data
+            print("\nFetching latest data...")
             stock = yf.Ticker(symbol)
             df = stock.history(period="60d")
             
             if df.empty:
                 print(f"No historical data available for {symbol}")
                 return None
+                
+            print(f"Fetched {len(df)} days of data")
             
             # Calculate all features
+            print("\nCalculating features...")
             df['Returns'] = df['Close'].pct_change()
             df['Volume_Change'] = df['Volume'].pct_change()
             df['Price_Range'] = (df['High'] - df['Low']) / df['Close']
@@ -247,7 +265,11 @@ class PredictionService:
             df['Price_Trend'] = df['Higher_Highs'] - df['Lower_Lows']
             
             # Drop rows with missing values
+            print("\nChecking for missing values...")
+            before_drop = len(df)
             df = df.dropna()
+            after_drop = len(df)
+            print(f"Rows before dropna: {before_drop}, after: {after_drop}")
             
             if df.empty:
                 print(f"No complete data available for {symbol}")
@@ -256,52 +278,94 @@ class PredictionService:
             # Get the last row
             last_row = df.iloc[-1:]
             
+            # Verify features
+            print("\nVerifying features...")
+            missing_features = [f for f in self.features if f not in last_row.columns]
+            if missing_features:
+                print(f"Missing features: {missing_features}")
+                return None
+                
+            print("Features available:", list(last_row.columns))
+            
             # Prepare features in the same order as training
+            print("\nPreparing features for prediction...")
             X = last_row[self.features].values
+            print("Input shape:", X.shape)
+            print("Feature values:", X[0])
             
             # Scale features
-            X_scaled = self.scalers[symbol].transform(X)
+            print("\nScaling features...")
+            scaler = self.scalers.get(symbol)
+            if scaler is None:
+                print(f"No scaler found for {symbol}")
+                return None
+                
+            X_scaled = scaler.transform(X)
+            print("Scaled shape:", X_scaled.shape)
+            print("Scaled values:", X_scaled[0])
             
             predictions = {}
             confidence_intervals = {}
             
             current_price = float(last_row['Close'].values[0])
+            print(f"\nCurrent price: {current_price}")
             
             # Make predictions with each model
+            print("\nMaking predictions...")
             for model_name, model in self.models[symbol].items():
                 try:
+                    print(f"\nPredicting with {model_name}...")
                     if model_name == 'rf':
                         # Get predictions from all trees
                         tree_preds = np.array([tree.predict(X_scaled)[0] for tree in model.estimators_])
                         return_pred = np.mean(tree_preds)
-                        std_err = stats.sem(tree_preds)
-                        return_ci = stats.t.interval(0.95, len(tree_preds)-1, loc=return_pred, scale=std_err)
+                        print(f"RF return prediction: {return_pred:.4f}")
+                        
+                        if len(tree_preds) > 1:
+                            std_err = stats.sem(tree_preds)
+                            return_ci = stats.t.interval(0.95, len(tree_preds)-1, loc=return_pred, scale=std_err)
+                        else:
+                            return_ci = (return_pred, return_pred)
                         
                         # Convert return prediction to price
                         pred_price = current_price * (1 + return_pred)
                         ci_prices = (current_price * (1 + return_ci[0]), current_price * (1 + return_ci[1]))
+                        print(f"RF price prediction: {pred_price:.2f}")
                         
                     else:  # Neural Network
                         # Get multiple predictions
                         return_preds = np.array([model.predict(X_scaled, verbose=0)[0][0] for _ in range(100)])
                         return_pred = np.mean(return_preds)
-                        std_err = stats.sem(return_preds)
-                        return_ci = stats.t.interval(0.95, len(return_preds)-1, loc=return_pred, scale=std_err)
+                        print(f"NN return prediction: {return_pred:.4f}")
+                        
+                        if len(return_preds) > 1:
+                            std_err = stats.sem(return_preds)
+                            return_ci = stats.t.interval(0.95, len(return_preds)-1, loc=return_pred, scale=std_err)
+                        else:
+                            return_ci = (return_pred, return_pred)
                         
                         # Convert return prediction to price
                         pred_price = current_price * (1 + return_pred)
                         ci_prices = (current_price * (1 + return_ci[0]), current_price * (1 + return_ci[1]))
+                        print(f"NN price prediction: {pred_price:.2f}")
                     
                     predictions[model_name] = float(pred_price)
                     confidence_intervals[model_name] = (float(ci_prices[0]), float(ci_prices[1]))
+                    print(f"Prediction stored for {model_name}")
                     
                 except Exception as e:
                     print(f"Error making prediction with {model_name}: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
                     continue
             
             if not predictions:
                 print("No successful predictions made")
                 return None
+            
+            print("\nPredictions completed successfully")
+            print("Final predictions:", predictions)
+            print("Confidence intervals:", confidence_intervals)
             
             self.confidence_intervals[symbol] = confidence_intervals
             return predictions
