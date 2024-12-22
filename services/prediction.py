@@ -379,209 +379,145 @@ class PredictionService:
         
         self.feature_importance[symbol] = dict(zip(features, importance))
     
-    def predict(self, symbol, period='1d'):
-        """Make predictions with confidence intervals"""
+    def predict_technical(self, symbol, period='1d'):
+        """Make predictions based on technical analysis"""
         try:
-            print(f"\n{'='*50}")
-            print(f"Starting prediction for {symbol}")
-            print(f"{'='*50}")
+            print(f"\nAnalyzing {symbol} using technical indicators...")
             
-            # Validate model and dependencies
-            if not self._validate_model(symbol):
-                return None
-            
-            # Get latest data
-            print("\nFetching latest data...")
+            # Fetch historical data
             stock = yf.Ticker(symbol)
             df = stock.history(period="60d")
             
-            # Validate raw data
-            if not self._validate_data(df, symbol, "prediction"):
-                return None
-            
-            # Calculate features with validation
-            print("\nCalculating prediction features...")
-            try:
-                feature_data = {}
-                
-                # Basic features
-                feature_data['Returns'] = df['Close'].pct_change()
-                feature_data['Volume_Change'] = df['Volume'].pct_change()
-                feature_data['Price_Range'] = (df['High'] - df['Low']) / df['Close']
-                
-                # Technical indicators
-                feature_data['RSI'] = self._calculate_rsi(df['Close'])
-                feature_data['Momentum'] = self._calculate_momentum(df['Close'])
-                feature_data['BB_Width'] = self._calculate_bollinger_bands(df['Close'])
-                feature_data['MACD_Hist'] = self._calculate_macd(df['Close'])
-                
-                # Moving averages
-                feature_data['MA5'] = df['Close'].rolling(window=5).mean()
-                feature_data['MA20'] = df['Close'].rolling(window=20).mean()
-                feature_data['MA50'] = df['Close'].rolling(window=50).mean()
-                feature_data['Trend_5_20'] = feature_data['MA5'] - feature_data['MA20']
-                feature_data['Trend_20_50'] = feature_data['MA20'] - feature_data['MA50']
-                
-                # Volume
-                feature_data['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
-                feature_data['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
-                feature_data['Volume_Trend'] = feature_data['Volume_MA5'] - feature_data['Volume_MA20']
-                
-                # Volatility
-                feature_data['Volatility'] = feature_data['Returns'].rolling(window=20).std()
-                feature_data['Volatility_Change'] = feature_data['Volatility'].pct_change()
-                
-                # Patterns
-                feature_data['Higher_Highs'] = (df['High'] > df['High'].shift(1)).astype(int)
-                feature_data['Lower_Lows'] = (df['Low'] < df['Low'].shift(1)).astype(int)
-                feature_data['Price_Trend'] = feature_data['Higher_Highs'] - feature_data['Lower_Lows']
-                
-                # Add features to dataframe
-                for name, data in feature_data.items():
-                    df[name] = data
-                
-            except Exception as e:
-                print(f"Error calculating features: {e}")
-                import traceback
-                traceback.print_exc()
-                return None
-            
-            # Validate features
-            if not self._validate_features(df, self.features):
-                return None
-            
-            # Drop rows with missing values
-            print("\nHandling missing values...")
-            before_drop = len(df)
-            df = df.dropna()
-            after_drop = len(df)
-            print(f"Rows dropped: {before_drop - after_drop}")
-            
             if df.empty:
-                print("No complete data available after feature calculation")
+                print("No data available")
                 return None
-            
-            # Get the last row
-            last_row = df.iloc[-1:]
-            current_price = float(last_row['Close'].values[0])
-            
-            # Prepare features
-            try:
-                print("\nPreparing input for prediction...")
-                X = last_row[self.features].values
-                print(f"Input shape before reshape: {X.shape}")
                 
-                # Ensure 2D array
-                if len(X.shape) == 1:
-                    X = X.reshape(1, -1)
-                print(f"Input shape after reshape: {X.shape}")
-                
-                # Scale features
-                scaler = self.scalers[symbol]
-                X_scaled = scaler.transform(X)
-                print("Scaled shape:", X_scaled.shape)
-                
-                # Verify scaled values
-                print("\nScaled feature values:")
-                for i, feature in enumerate(self.features):
-                    print(f"{feature}: {X_scaled[0, i]:.4f}")
-                
-            except Exception as e:
-                print(f"Error preparing features: {e}")
-                import traceback
-                traceback.print_exc()
-                return None
+            current_price = float(df['Close'].iloc[-1])
             
-            predictions = {}
-            confidence_intervals = {}
+            # Calculate technical indicators
+            # 1. RSI
+            rsi = self._calculate_rsi(df['Close'])
+            current_rsi = rsi.iloc[-1]
             
-            # Make predictions
-            for model_name, model in self.models[symbol].items():
-                try:
-                    print(f"\nPredicting with {model_name}...")
-                    print(f"Model type: {type(model).__name__}")
-                    
-                    if model_name == 'rf':
-                        # Random Forest prediction
-                        tree_preds = []
-                        for i, tree in enumerate(model.estimators_):
-                            try:
-                                pred = tree.predict(X_scaled)[0]
-                                if np.isfinite(pred):
-                                    tree_preds.append(pred)
-                            except Exception as e:
-                                print(f"Tree {i} prediction failed: {e}")
-                                continue
-                        
-                        if not tree_preds:
-                            print("No valid tree predictions")
-                            continue
-                            
-                        return_pred = np.mean(tree_preds)
-                        print(f"Number of valid tree predictions: {len(tree_preds)}")
-                        print(f"Return prediction: {return_pred:.4f}")
-                        
-                        if len(tree_preds) > 1:
-                            std_err = stats.sem(tree_preds)
-                            return_ci = stats.t.interval(0.95, len(tree_preds)-1, loc=return_pred, scale=std_err)
-                        else:
-                            return_ci = (return_pred, return_pred)
-                        
-                    else:  # Neural Network
-                        # Multiple predictions for uncertainty
-                        nn_preds = []
-                        for i in range(100):
-                            try:
-                                pred = model.predict(X_scaled, verbose=0)[0][0]
-                                if np.isfinite(pred):
-                                    nn_preds.append(pred)
-                            except Exception as e:
-                                print(f"NN prediction {i} failed: {e}")
-                                continue
-                        
-                        if not nn_preds:
-                            print("No valid NN predictions")
-                            continue
-                            
-                        return_pred = np.mean(nn_preds)
-                        print(f"Number of valid NN predictions: {len(nn_preds)}")
-                        print(f"Return prediction: {return_pred:.4f}")
-                        
-                        if len(nn_preds) > 1:
-                            std_err = stats.sem(nn_preds)
-                            return_ci = stats.t.interval(0.95, len(nn_preds)-1, loc=return_pred, scale=std_err)
-                        else:
-                            return_ci = (return_pred, return_pred)
-                    
-                    # Convert return prediction to price
-                    pred_price = current_price * (1 + return_pred)
-                    ci_prices = (current_price * (1 + return_ci[0]), current_price * (1 + return_ci[1]))
-                    
-                    predictions[model_name] = float(pred_price)
-                    confidence_intervals[model_name] = (float(ci_prices[0]), float(ci_prices[1]))
-                    
-                except Exception as e:
-                    print(f"Error in {model_name} prediction: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
+            # 2. MACD
+            macd_hist = self._calculate_macd(df['Close'])
+            current_macd = macd_hist.iloc[-1]
             
-            # Validate predictions
-            if not self._validate_predictions(predictions, current_price):
-                return None
+            # 3. Moving Averages
+            ma5 = df['Close'].rolling(window=5).mean()
+            ma20 = df['Close'].rolling(window=20).mean()
+            current_ma5 = ma5.iloc[-1]
+            current_ma20 = ma20.iloc[-1]
             
-            print("\nPredictions completed successfully")
-            print("Final predictions:", predictions)
-            print("Confidence intervals:", confidence_intervals)
+            # 4. Price Momentum
+            momentum = self._calculate_momentum(df['Close'])
+            current_momentum = momentum.iloc[-1]
             
-            self.confidence_intervals[symbol] = confidence_intervals
+            # 5. Bollinger Bands
+            bb_width = self._calculate_bollinger_bands(df['Close'])
+            current_bb = bb_width.iloc[-1]
+            
+            # 6. Volume Analysis
+            volume_ma5 = df['Volume'].rolling(window=5).mean()
+            current_volume = df['Volume'].iloc[-1]
+            volume_trend = current_volume / volume_ma5.iloc[-1] - 1
+            
+            # Analyze signals
+            signals = []
+            signal_strengths = []
+            
+            # RSI signals
+            if current_rsi < 30:
+                signals.append(1)  # Oversold - bullish
+                signal_strengths.append(1.5)
+            elif current_rsi > 70:
+                signals.append(-1)  # Overbought - bearish
+                signal_strengths.append(1.5)
+            else:
+                signals.append(0)
+                signal_strengths.append(1.0)
+            
+            # MACD signals
+            if current_macd > 0:
+                signals.append(1)  # Bullish
+                signal_strengths.append(1.2)
+            else:
+                signals.append(-1)  # Bearish
+                signal_strengths.append(1.2)
+            
+            # Moving Average signals
+            if current_ma5 > current_ma20:
+                signals.append(1)  # Golden cross - bullish
+                signal_strengths.append(1.3)
+            else:
+                signals.append(-1)  # Death cross - bearish
+                signal_strengths.append(1.3)
+            
+            # Momentum signals
+            if current_momentum > 0:
+                signals.append(1)
+                signal_strengths.append(1.1)
+            else:
+                signals.append(-1)
+                signal_strengths.append(1.1)
+            
+            # Volume trend signals
+            if volume_trend > 0.1:  # Volume increasing
+                signals.append(1)
+                signal_strengths.append(1.2)
+            elif volume_trend < -0.1:  # Volume decreasing
+                signals.append(-1)
+                signal_strengths.append(1.2)
+            else:
+                signals.append(0)
+                signal_strengths.append(1.0)
+            
+            # Calculate weighted signal
+            weighted_signal = sum(s * w for s, w in zip(signals, signal_strengths)) / sum(signal_strengths)
+            
+            # Convert signal to price prediction
+            # Scale the signal to a reasonable percentage change (-2% to +2%)
+            predicted_change = weighted_signal * 0.02
+            
+            # Calculate predicted price
+            predicted_price = current_price * (1 + predicted_change)
+            
+            # Calculate confidence intervals
+            confidence_range = abs(predicted_change) * 0.5
+            lower_bound = current_price * (1 + predicted_change - confidence_range)
+            upper_bound = current_price * (1 + predicted_change + confidence_range)
+            
+            print("\nTechnical Analysis Summary:")
+            print(f"Current Price: ${current_price:.2f}")
+            print(f"RSI: {current_rsi:.2f}")
+            print(f"MACD: {current_macd:.2f}")
+            print(f"MA5/MA20: {current_ma5:.2f}/{current_ma20:.2f}")
+            print(f"Momentum: {current_momentum:.2f}")
+            print(f"Volume Trend: {volume_trend:.2%}")
+            print(f"\nWeighted Signal: {weighted_signal:.2f}")
+            print(f"Predicted Change: {predicted_change:.2%}")
+            print(f"Predicted Price: ${predicted_price:.2f}")
+            print(f"Confidence Interval: ${lower_bound:.2f} to ${upper_bound:.2f}")
+            
+            predictions = {
+                'technical': float(predicted_price)
+            }
+            
+            self.confidence_intervals[symbol] = {
+                'technical': (float(lower_bound), float(upper_bound))
+            }
+            
             return predictions
             
         except Exception as e:
-            print(f"Error in prediction process: {str(e)}")
+            print(f"Error in technical analysis: {str(e)}")
             import traceback
             traceback.print_exc()
             return None
+            
+    def predict(self, symbol, period='1d'):
+        """Make predictions using technical analysis"""
+        return self.predict_technical(symbol, period)
     
     def get_prediction_history(self, symbol):
         """Get prediction history"""
