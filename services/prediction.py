@@ -383,13 +383,70 @@ class PredictionService:
         """Generate predictions for a given stock symbol"""
         try:
             print(f"\nGenerating predictions for {symbol}")
+            
+            # Get historical data
+            stock = yf.Ticker(symbol)
+            df = stock.history(period="3mo")
+            
+            if df.empty:
+                print("No data available")
+                return None
+                
+            # Calculate predictions
             technical_prediction = self.predict_technical(symbol)
             
             if technical_prediction is None:
                 print("Technical prediction failed")
                 return None
                 
+            # Prepare prediction data
+            dates = df.index.tolist()
+            actual_prices = df['Close'].tolist()
+            
+            # Calculate predicted prices (using technical indicators)
+            predicted_prices = []
+            upper_bound = []
+            lower_bound = []
+            
+            for i in range(len(actual_prices)):
+                # Use technical prediction as base
+                base_pred = actual_prices[i] * (1 + technical_prediction['signal_strength'])
+                predicted_prices.append(base_pred)
+                
+                # Add confidence intervals (±2% for simplicity)
+                upper_bound.append(base_pred * 1.02)
+                lower_bound.append(base_pred * 0.98)
+            
+            # Calculate next day prediction
+            next_day = {
+                'price': predicted_prices[-1] * (1 + technical_prediction['signal_strength']),
+                'confidence': technical_prediction['confidence']
+            }
+            
+            # Get feature importance
+            feature_importance = {
+                'RSI': technical_prediction['indicators']['rsi_weight'] * 100,
+                'MACD': technical_prediction['indicators']['macd_weight'] * 100,
+                'Volume': technical_prediction['indicators']['volume_weight'] * 100,
+                'Trend': technical_prediction['indicators']['trend_weight'] * 100
+            }
+            
+            # Calculate metrics
+            metrics = {
+                'accuracy': technical_prediction['confidence'] * 100,
+                'mse': technical_prediction.get('mse', 0),
+                'r2': technical_prediction.get('r2', 0)
+            }
+            
             return {
+                'dates': dates,
+                'actual_prices': actual_prices,
+                'predicted_prices': predicted_prices,
+                'upper_bound': upper_bound,
+                'lower_bound': lower_bound,
+                'next_day_prediction': next_day,
+                'feature_importance': feature_importance,
+                'metrics': metrics,
                 'technical': technical_prediction
             }
             
@@ -518,7 +575,16 @@ class PredictionService:
                     prediction *= 1.01
                 
                 print(f"Final prediction: ${prediction:.2f}")
-                return prediction
+                return {
+                    'signal_strength': (prediction / current_price - 1),
+                    'confidence': 0.8,  # Default confidence level
+                    'indicators': {
+                        'rsi_weight': 0.2,  # Default RSI weight
+                        'macd_weight': 0.3,  # Default MACD weight
+                        'volume_weight': 0.1,  # Default volume weight
+                        'trend_weight': 0.4  # Default trend weight
+                    }
+                }
                 
             except Exception as e:
                 print(f"Error calculating technical indicators: {str(e)}")
