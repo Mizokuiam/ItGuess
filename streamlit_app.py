@@ -104,7 +104,7 @@ st.markdown("""
         max-width: fit-content;
     }
     
-    /* Feature cards */
+    /* Feature cards with improved styling */
     .features-container {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -117,39 +117,63 @@ st.markdown("""
     .feature-card {
         background: var(--card-background);
         border-radius: 20px;
-        padding: 30px;
+        padding: 35px;
         text-align: center;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border: 1px solid var(--border-color);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 2px solid var(--border-color);
+        position: relative;
+        overflow: hidden;
     }
     
     .feature-card:hover {
         transform: translateY(-10px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        border-color: var(--gradient-start);
+    }
+    
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+    
+    .feature-card:hover::before {
+        transform: scaleX(1);
     }
     
     .feature-icon {
-        font-size: 3em;
-        margin-bottom: 20px;
-        display: inline-block;
-        padding: 20px;
-        background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-        border-radius: 50%;
-        color: white;
+        font-size: 3.5em;
+        margin-bottom: 25px;
+        display: block;
+        transition: transform 0.3s ease;
+    }
+    
+    .feature-card:hover .feature-icon {
+        transform: scale(1.1);
     }
     
     .feature-title {
-        font-size: 1.5em;
-        font-weight: 600;
-        margin-bottom: 15px;
+        font-size: 1.6em;
+        font-weight: 700;
+        margin-bottom: 20px;
         color: var(--text-color);
+        position: relative;
+        display: inline-block;
     }
     
     .feature-description {
         color: var(--text-color);
-        line-height: 1.6;
+        line-height: 1.7;
         font-size: 1.1em;
         opacity: 0.9;
+        margin: 0 auto;
+        max-width: 90%;
     }
     
     /* Search box with improved styling */
@@ -368,26 +392,26 @@ if not symbol:  # Show welcome page when no symbol is entered
     st.markdown("""
         <div class="features-container">
             <div class="feature-card">
-                <div class="feature-icon">📊</div>
+                <span class="feature-icon">🎯</span>
                 <div class="feature-title">Technical Analysis</div>
                 <div class="feature-description">
-                    Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis
+                    Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.
                 </div>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon">🤖</div>
+                <span class="feature-icon">📈</span>
                 <div class="feature-title">Price Prediction</div>
                 <div class="feature-description">
-                    AI-powered price predictions based on technical analysis and market patterns
+                    AI-powered price predictions based on technical analysis and market patterns.
                 </div>
             </div>
             
             <div class="feature-card">
-                <div class="feature-icon">📈</div>
+                <span class="feature-icon">📊</span>
                 <div class="feature-title">Live Charts</div>
                 <div class="feature-description">
-                    Real-time interactive charts with customizable indicators and time periods
+                    Real-time interactive charts with customizable indicators and time periods.
                 </div>
             </div>
         </div>
