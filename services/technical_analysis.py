@@ -35,10 +35,10 @@ class TechnicalAnalysisService:
             df = self.data.copy()
 
             # Calculate RSI with current rsi_period from streamlit
-            rsi = self.calculate_rsi(df['Close'].values)
+            rsi = self.calculate_rsi(df['Close'].values, period=14)
             
             # Calculate MACD
-            macd, signal = self.calculate_macd(df['Close'])
+            macd, signal = self.calculate_macd(df['Close'], fast=12, slow=26, signal=9)
             
             # Calculate EMAs
             ema_20 = self.calculate_ema(df['Close'], window=20)
@@ -87,55 +87,24 @@ class TechnicalAnalysisService:
             print(f"Error calculating indicators: {str(e)}")
             return None
 
-    def calculate_rsi(self, data, window=14):
+    def calculate_rsi(self, data, period=14):
         """Calculate RSI for given price data
         
         Args:
             data: numpy array or pandas Series of prices
-            window: RSI period/window (default: 14)
+            period: RSI period/window (default: 14)
         """
         try:
-            # Validate window
-            if not isinstance(window, (int, float)) or window <= 0:
-                raise ValueError("RSI window must be a positive number")
-            window = int(window)  # Convert to integer
+            # Validate period
+            if not isinstance(period, (int, float)) or period <= 0:
+                raise ValueError("RSI period must be a positive number")
+            period = int(period)  # Convert to integer
             
-            # Convert to numpy array if needed
-            if not isinstance(data, np.ndarray):
-                data = np.array(data)
-            
-            if len(data) < window + 1:
-                return None
-            
-            # Calculate price changes
-            deltas = np.diff(data)
-            
-            # Separate gains and losses
-            gains = np.where(deltas > 0, deltas, 0)
-            losses = np.where(deltas < 0, -deltas, 0)
-            
-            # Calculate average gains and losses
-            avg_gains = np.zeros_like(deltas)
-            avg_losses = np.zeros_like(deltas)
-            
-            # First average
-            avg_gains[window-1] = np.mean(gains[:window])
-            avg_losses[window-1] = np.mean(losses[:window])
-            
-            # Calculate subsequent values
-            for i in range(window, len(deltas)):
-                avg_gains[i] = (avg_gains[i-1] * (window-1) + gains[i]) / window
-                avg_losses[i] = (avg_losses[i-1] * (window-1) + losses[i]) / window
-            
-            # Calculate RS and RSI
-            rs = avg_gains / np.where(avg_losses == 0, 1e-9, avg_losses)  # Avoid division by zero
-            rsi = 100 - (100 / (1 + rs))
-            
-            # Pad the beginning with None
-            full_rsi = np.full(len(data), np.nan)
-            full_rsi[window:] = rsi[window-1:]
-            
-            return pd.Series(full_rsi, index=pd.Series(data).index)
+            # Calculate RSI using pandas_ta
+            if data is not None and len(data) > 0:
+                rsi = pd.Series(ta.rsi(data, length=period))
+                return rsi
+            return None
             
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")
@@ -216,26 +185,34 @@ class TechnicalAnalysisService:
         self.data['EMA26'] = self.data['Close'].ewm(span=26, adjust=False, min_periods=1).mean()
         
     def calculate_rsi(self, period=14):
-        """Calculate Relative Strength Index"""
-        if period <= 0:
-            raise ValueError("RSI period must be greater than 0")
+        """Calculate Relative Strength Index
+        
+        Args:
+            period: RSI period/window (default: 14)
+        """
         try:
-            delta = self.data['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
-            rs = gain / loss
-            self.data['RSI'] = 100 - (100 / (1 + rs))
+            # Validate period
+            if not isinstance(period, (int, float)) or period <= 0:
+                raise ValueError("RSI period must be a positive number")
+            period = int(period)  # Convert to integer
+            
+            # Calculate RSI using pandas_ta
+            if self.data is not None and not self.data.empty:
+                rsi = pd.Series(ta.rsi(self.data['Close'], length=period))
+                return rsi
+            return None
+            
         except Exception as e:
             print(f"Error calculating RSI: {str(e)}")
-            self.data['RSI'] = float('nan')
-        
-    def calculate_macd(self):
+            return None
+
+    def calculate_macd(self, fast=12, slow=26, signal=9):
         """Calculate MACD indicator"""
         try:
-            exp1 = self.data['Close'].ewm(span=12, adjust=False, min_periods=1).mean()
-            exp2 = self.data['Close'].ewm(span=26, adjust=False, min_periods=1).mean()
+            exp1 = self.data['Close'].ewm(span=fast, adjust=False, min_periods=1).mean()
+            exp2 = self.data['Close'].ewm(span=slow, adjust=False, min_periods=1).mean()
             self.data['MACD'] = exp1 - exp2
-            self.data['Signal_Line'] = self.data['MACD'].ewm(span=9, adjust=False, min_periods=1).mean()
+            self.data['Signal_Line'] = self.data['MACD'].ewm(span=signal, adjust=False, min_periods=1).mean()
         except Exception as e:
             print(f"Error calculating MACD: {str(e)}")
             self.data['MACD'] = float('nan')

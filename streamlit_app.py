@@ -144,7 +144,7 @@ with st.sidebar:
     
     # Add technical analysis settings
     st.subheader("Technical Analysis Settings")
-    rsi_period = st.slider("RSI Period", min_value=1, max_value=21, value=14)
+    rsi_period = st.slider("RSI Period", min_value=1, max_value=21, value=14, key='rsi_period')
     ma_period = st.slider("Moving Average Period", min_value=1, max_value=50, value=20)
     
     # Add auto-refresh option
@@ -218,11 +218,16 @@ if symbol:
                     st.header("Technical Analysis")
                     
                     try:
-                        # Initialize technical analysis with current symbol and data
-                        technical_analysis.symbol = symbol
-                        technical_analysis.data = hist.copy()  # Create a copy of the data
+                        # Get RSI period from sidebar
+                        rsi_period = st.session_state.get('rsi_period', 14)
                         
-                        # Calculate indicators
+                        # Initialize technical analysis with current symbol and data
+                        technical_analysis = TechnicalAnalysisService(symbol=symbol, data=hist.copy())
+                        
+                        # Calculate RSI with the current period
+                        rsi = technical_analysis.calculate_rsi(period=rsi_period)
+                        
+                        # Calculate other indicators
                         indicators = technical_analysis.calculate_indicators()
                         
                         if indicators and any(v != 'N/A' for v in indicators.values()):
@@ -230,7 +235,11 @@ if symbol:
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 rsi_val = indicators.get('RSI', 'N/A')
-                                st.metric("RSI", f"{rsi_val}")
+                                if rsi_val != 'N/A':
+                                    rsi_color = 'red' if float(rsi_val) > 70 else 'green' if float(rsi_val) < 30 else 'normal'
+                                    st.metric("RSI", f"{rsi_val}", delta_color=rsi_color)
+                                else:
+                                    st.metric("RSI", "N/A")
                                 
                                 macd = indicators.get('MACD', 'N/A')
                                 st.metric("MACD", f"{macd}")
@@ -297,85 +306,55 @@ if symbol:
                     st.header("Live Chart")
                     
                     try:
-                        # Calculate technical indicators
-                        technical_analysis.data = hist.copy()
-                        rsi_data = technical_analysis.calculate_rsi(data=hist['Close'].values, window=rsi_period)
-                        ema_short = technical_analysis.calculate_ema(data=hist['Close'], window=ma_period)
-                        ema_long = technical_analysis.calculate_ema(data=hist['Close'], window=50)
-                        bb_upper, bb_middle, bb_lower = technical_analysis.calculate_bollinger_bands(data=hist['Close'], window=20)
+                        # Get periods from session state
+                        rsi_period = st.session_state.get('rsi_period', 14)
+                        ma_period = st.session_state.get('ma_period', 20)
                         
-                        if rsi_data is not None:
-                            # Create figure with secondary y-axis
-                            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                        # Create technical analysis instance with current data
+                        ta_service = TechnicalAnalysisService(symbol=symbol, data=hist.copy())
+                        
+                        # Calculate indicators
+                        rsi = ta_service.calculate_rsi(period=rsi_period)
+                        indicators = ta_service.calculate_indicators()
+                        
+                        # Create figure with secondary y-axis
+                        fig = make_subplots(rows=2, cols=1, shared_xaxis=True, 
                                           vertical_spacing=0.03, 
                                           row_heights=[0.7, 0.3])
 
-                            # Add candlestick
-                            fig.add_trace(go.Candlestick(x=hist.index,
-                                                   open=hist['Open'],
-                                                   high=hist['High'],
-                                                   low=hist['Low'],
-                                                   close=hist['Close'],
-                                                   name='OHLC'),
+                        # Add candlestick
+                        fig.add_trace(go.Candlestick(x=hist.index,
+                                                    open=hist['Open'],
+                                                    high=hist['High'],
+                                                    low=hist['Low'],
+                                                    close=hist['Close'],
+                                                    name='OHLC'),
                                     row=1, col=1)
 
-                            # Add EMAs
-                            if ema_short is not None:
-                                fig.add_trace(go.Scatter(x=hist.index, y=ema_short,
-                                               line=dict(color='orange', width=1),
-                                               name=f'EMA {ma_period}'),
-                                    row=1, col=1)
+                        # Add RSI
+                        if rsi is not None:
+                            fig.add_trace(go.Scatter(x=hist.index, 
+                                                   y=rsi,
+                                                   name='RSI',
+                                                   line=dict(color='purple')),
+                                        row=2, col=1)
                             
-                            if ema_long is not None:
-                                fig.add_trace(go.Scatter(x=hist.index, y=ema_long,
-                                               line=dict(color='blue', width=1),
-                                               name='EMA 50'),
-                                    row=1, col=1)
+                            # Add RSI reference lines
+                            fig.add_hline(y=70, line_width=1, line_dash="dash", line_color="red", row=2, col=1)
+                            fig.add_hline(y=30, line_width=1, line_dash="dash", line_color="green", row=2, col=1)
 
-                            # Add Bollinger Bands
-                            if all(x is not None for x in [bb_upper, bb_lower]):
-                                fig.add_trace(go.Scatter(x=hist.index, y=bb_upper,
-                                               line=dict(color='gray', width=1, dash='dash'),
-                                               name='BB Upper'),
-                                    row=1, col=1)
-                                
-                                fig.add_trace(go.Scatter(x=hist.index, y=bb_lower,
-                                               line=dict(color='gray', width=1, dash='dash'),
-                                               name='BB Lower',
-                                               fill='tonexty'),
-                                    row=1, col=1)
+                        # Update layout
+                        fig.update_layout(
+                            title=f'{symbol} Live Chart',
+                            yaxis_title='Price',
+                            yaxis2_title='RSI',
+                            xaxis_rangeslider_visible=False,
+                            height=800
+                        )
 
-                            # Add RSI
-                            fig.add_trace(go.Scatter(x=hist.index, y=rsi_data,
-                                               line=dict(color='purple', width=1),
-                                               name='RSI'),
-                                    row=2, col=1)
-
-                            # Add RSI levels
-                            fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-                            fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-
-                            # Update layout
-                            fig.update_layout(
-                                xaxis_rangeslider_visible=False,
-                                height=800,
-                                title_text=f"{symbol} Technical Analysis",
-                                showlegend=True,
-                                legend=dict(
-                                    yanchor="top",
-                                    y=0.99,
-                                    xanchor="left",
-                                    x=0.01
-                                )
-                            )
-
-                            # Update y-axes labels
-                            fig.update_yaxes(title_text="Price", row=1, col=1)
-                            fig.update_yaxes(title_text="RSI", row=2, col=1)
-
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.error("Not enough data to calculate technical indicators")
+                        # Display the chart
+                        st.plotly_chart(fig, use_container_width=True)
+                        
                     except Exception as e:
                         st.error(f"Error creating live chart: {str(e)}")
             
