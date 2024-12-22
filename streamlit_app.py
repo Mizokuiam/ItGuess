@@ -14,180 +14,110 @@ from io import BytesIO
 
 # Page config
 st.set_page_config(
-    page_title="ItGuess - Stock Price Predictor",
-    page_icon="♾️",
+    page_title="ItGuess - Stock Analysis",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state
-if 'theme' not in st.session_state:
-    st.session_state.theme = 'light'
+# Custom CSS for clean, modern design
+st.markdown("""
+    <style>
+        /* Reset and base styles */
+        .stApp {
+            background-color: #ffffff;
+        }
+        
+        /* Header styling */
+        h1 {
+            color: #1a237e;
+            font-family: 'Helvetica Neue', sans-serif;
+            font-weight: 600;
+            font-size: 3rem;
+            text-align: center;
+            margin: 2rem 0;
+            padding-bottom: 1rem;
+            border-bottom: 3px solid #1a237e;
+        }
+        
+        /* Metrics styling */
+        div[data-testid="stMetricValue"] {
+            font-size: 1.8rem !important;
+            color: #1a237e !important;
+        }
+        
+        div[data-testid="stMetricLabel"] {
+            font-size: 1rem !important;
+        }
+        
+        /* Card styling */
+        div.stMetric {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        /* Sidebar styling */
+        section[data-testid="stSidebar"] {
+            background-color: #f8f9fa;
+            padding: 2rem 1rem;
+        }
+        
+        /* Button styling */
+        .stButton button {
+            background-color: #1a237e;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .stButton button:hover {
+            background-color: #283593;
+            border: none;
+        }
+        
+        /* Input fields */
+        .stTextInput input {
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        /* Tabs styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            padding: 0.5rem;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            height: 3rem;
+            white-space: pre-wrap;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            color: #1a237e;
+            font-weight: 500;
+        }
+        
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            background-color: #1a237e;
+            color: white;
+        }
+        
+        /* Plot styling */
+        .js-plotly-plot {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Initialize session state for symbol tracking
 if 'last_symbol' not in st.session_state:
     st.session_state.last_symbol = ''
 if 'last_update' not in st.session_state:
     st.session_state.last_update = datetime.now()
-
-# Custom CSS with dynamic theme
-def get_theme_css():
-    if st.session_state.theme == 'dark':
-        return """
-        :root {
-            --primary-color: #4CAF50;
-            --background-color: #1E1E1E;
-            --text-color: #FFFFFF;
-            --card-bg-color: #2D2D2D;
-            --hover-color: #3D3D3D;
-            --border-color: #404040;
-        }
-        """
-    else:
-        return """
-        :root {
-            --primary-color: #1E88E5;
-            --background-color: #FFFFFF;
-            --text-color: #333333;
-            --card-bg-color: #F8F9FA;
-            --hover-color: #E9ECEF;
-            --border-color: #DEE2E6;
-        }
-        """
-
-st.markdown(f"""
-    <style>
-        {get_theme_css()}
-        
-        /* Global Styles */
-        .stApp {{
-            background-color: var(--background-color);
-            color: var(--text-color);
-        }}
-        
-        /* Main title styling */
-        .main-title {{
-            color: var(--text-color);
-            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-            font-weight: 700;
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-            letter-spacing: -0.5px;
-            background: linear-gradient(135deg, var(--primary-color), #64B5F6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 2px 2px 4px rgba(30, 136, 229, 0.1);
-        }}
-        
-        /* Card styling */
-        .stMetric {{
-            background-color: var(--card-bg-color);
-            border-radius: 10px;
-            padding: 1rem;
-            border: 1px solid var(--border-color);
-            transition: transform 0.2s;
-        }}
-        
-        .stMetric:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }}
-        
-        /* Tab styling */
-        .stTabs [data-baseweb="tab-list"] {{
-            gap: 2px;
-            background-color: var(--card-bg-color);
-            border-radius: 10px;
-            padding: 0.5rem;
-        }}
-        
-        .stTabs [data-baseweb="tab"] {{
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            transition: all 0.2s;
-        }}
-        
-        .stTabs [data-baseweb="tab"]:hover {{
-            background-color: var(--hover-color);
-        }}
-        
-        /* Button styling */
-        .stButton>button {{
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            transition: all 0.2s;
-        }}
-        
-        .stButton>button:hover {{
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }}
-        
-        /* Slider styling */
-        .stSlider {{
-            padding: 1rem 0;
-        }}
-        
-        /* Tooltip styling */
-        .tooltip {{
-            position: relative;
-            display: inline-block;
-        }}
-        
-        .tooltip .tooltiptext {{
-            visibility: hidden;
-            background-color: var(--card-bg-color);
-            color: var(--text-color);
-            text-align: center;
-            padding: 5px;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.2s;
-        }}
-        
-        .tooltip:hover .tooltiptext {{
-            visibility: visible;
-            opacity: 1;
-        }}
-        
-        /* Animation classes */
-        @keyframes fadeIn {{
-            from {{ opacity: 0; }}
-            to {{ opacity: 1; }}
-        }}
-        
-        .fade-in {{
-            animation: fadeIn 0.5s ease-in;
-        }}
-        
-        /* Responsive design */
-        @media (max-width: 768px) {{
-            .main-title {{
-                font-size: 2rem;
-            }}
-        }}
-        
-        /* Company symbol */
-        .company-symbol {{
-            font-size: 3rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }}
-        
-        /* Company description */
-        .company-description {{
-            font-size: 1.2rem;
-            color: var(--text-color);
-        }}
-    </style>
-""", unsafe_allow_html=True)
 
 # Helper functions
 @st.cache_data(ttl=3600)
@@ -220,42 +150,22 @@ def get_company_info(symbol):
 # Initialize services
 @st.cache_resource
 def get_services():
-    technical_analysis = TechnicalAnalysisService()
-    prediction_service = PredictionService()
-    news_service = NewsService()
-    return technical_analysis, prediction_service, news_service
+    return TechnicalAnalysisService(), PredictionService(), NewsService()
 
 technical_analysis, prediction_service, news_service = get_services()
 
 # Sidebar
 with st.sidebar:
-    st.image("https://raw.githubusercontent.com/Mizokuiam/ItGuess/master/static/images/logo.png", width=50)
-    st.title("ItGuess")
-    
-    # Theme toggle
-    theme = st.toggle("Dark Mode", value=st.session_state.theme == 'dark')
-    st.session_state.theme = 'dark' if theme else 'light'
-    
-    # About section
-    with st.expander("About ItGuess"):
-        st.write("""
-        ItGuess is an advanced stock price prediction tool that combines:
-        - Technical Analysis
-        - Machine Learning
-        - Real-time Market Data
-        
-        Make informed investment decisions with our comprehensive analysis.
-        """)
-    
-    # Settings sections
-    st.subheader("Settings")
+    st.markdown("<h1 style='text-align: center; color: #1a237e; font-family: \"Helvetica Neue\", sans-serif; font-weight: 700; font-size: 2.5rem; margin-bottom: 2rem;'>ItGuess</h1>", unsafe_allow_html=True)
     
     # Stock input with popular stocks
     with st.expander("Stock Selection", expanded=True):
         popular_stocks = {
-            "Tech": ["AAPL", "GOOGL", "MSFT"],
-            "EV": ["TSLA", "NIO", "RIVN"],
-            "Finance": ["JPM", "BAC", "GS"]
+            "Popular Tech": ["AAPL", "GOOGL", "MSFT", "META", "NVDA"],
+            "Popular EV": ["TSLA", "RIVN", "NIO", "LCID"],
+            "Popular Finance": ["JPM", "BAC", "GS", "V", "MA"],
+            "Popular Retail": ["AMZN", "WMT", "TGT", "COST"],
+            "Popular Crypto": ["COIN", "MSTR", "RIOT", "MARA"]
         }
         
         for sector, stocks in popular_stocks.items():
@@ -380,7 +290,7 @@ if symbol:
                             yaxis_title="Price",
                             xaxis_title="Date",
                             height=400,
-                            template='plotly_dark' if st.session_state.theme == 'dark' else 'plotly_white'
+                            template='plotly_white'
                         )
                         
                         st.plotly_chart(fig, use_container_width=True)
@@ -745,7 +655,7 @@ if symbol:
                                 xaxis_title="Time",
                                 yaxis_title="Price",
                                 height=400,
-                                template='plotly_dark' if st.session_state.theme == 'dark' else 'plotly_white'
+                                template='plotly_white'
                             )
                             
                             st.plotly_chart(fig, use_container_width=True)
@@ -819,7 +729,7 @@ if symbol:
                 chart_theme = st.selectbox(
                     "Chart Theme",
                     options=['Light', 'Dark'],
-                    index=1 if st.session_state.theme == 'dark' else 0
+                    index=0
                 )
             
             # Get stock data
@@ -961,7 +871,7 @@ if symbol:
                             xaxis_title="Date",
                             yaxis_title="Price",
                             height=800,
-                            template='plotly_dark' if chart_theme == 'Dark' else 'plotly_white',
+                            template='plotly_white' if chart_theme == 'Light' else 'plotly_dark',
                             showlegend=True,
                             legend=dict(
                                 yanchor="top",
