@@ -423,13 +423,17 @@ class PredictionService:
             confidence = technical_prediction['confidence']
             
             future_predictions = {
+                '1_day': {
+                    'price': current_price * (1 + signal),
+                    'confidence': confidence * 0.98
+                },
                 '3_days': {
                     'price': current_price * (1 + signal * 3),
                     'confidence': confidence * 0.95
                 },
                 '1_week': {
                     'price': current_price * (1 + signal * 7),
-                    'confidence': confidence * 0.9
+                    'confidence': confidence * 0.90
                 },
                 '2_weeks': {
                     'price': current_price * (1 + signal * 14),
@@ -437,15 +441,15 @@ class PredictionService:
                 },
                 '1_month': {
                     'price': current_price * (1 + signal * 30),
-                    'confidence': confidence * 0.8
+                    'confidence': confidence * 0.80
+                },
+                '3_months': {
+                    'price': current_price * (1 + signal * 90),
+                    'confidence': confidence * 0.70
                 },
                 '1_year': {
                     'price': current_price * (1 + signal * 365),
-                    'confidence': confidence * 0.6
-                },
-                '5_years': {
-                    'price': current_price * (1 + signal * 1825),
-                    'confidence': confidence * 0.4
+                    'confidence': confidence * 0.60
                 }
             }
             

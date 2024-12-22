@@ -693,12 +693,13 @@ if symbol:
                             current_price = prediction_data['actual_prices'][-1]
                             
                             periods = {
+                                '1_day': 'Next Day',
                                 '3_days': 'Next 3 Days',
                                 '1_week': 'Next Week',
                                 '2_weeks': 'Next 2 Weeks',
                                 '1_month': 'Next Month',
-                                '1_year': 'Next Year',
-                                '5_years': 'Next 5 Years'
+                                '3_months': 'Next 3 Months',
+                                '1_year': 'Next Year'
                             }
                             
                             for key, label in periods.items():
