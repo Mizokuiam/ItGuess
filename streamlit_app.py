@@ -743,16 +743,18 @@ if symbol:
                     for _, row in news_data.iterrows():
                         with st.container():
                             sentiment_color = "#28a745" if row['sentiment'] > 0.2 else "#dc3545" if row['sentiment'] < -0.2 else "#6c757d"
-                            sentiment_label = "Positive" if row['sentiment'] > 0.2 else "Negative" if row['sentiment'] < -0.2 else "Neutral"
                             
                             st.markdown(f"""
                             <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
                                 <div style='border-left: 4px solid {sentiment_color}; padding-left: 10px;'>
                                     <h4 style='margin: 0; color: #333;'>{row['title']}</h4>
                                     <p style='margin: 10px 0; color: #666;'>{row['summary']}</p>
-                                    <div style='display: flex; justify-content: space-between; color: #888; font-size: 0.9em;'>
-                                        <span>{row['date']}</span>
-                                        <span style='color: {sentiment_color};'>●&nbsp;{sentiment_label}</span>
+                                    <div style='display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 0.9em;'>
+                                        <div>
+                                            <span>{row['date'].strftime('%Y-%m-%d %H:%M')}</span>
+                                            <span style='margin-left: 10px;'>Source: {row['source']}</span>
+                                        </div>
+                                        <span style='color: {sentiment_color};'>●&nbsp;{row['sentiment_category']}</span>
                                     </div>
                                 </div>
                             </div>

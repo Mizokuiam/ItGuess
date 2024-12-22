@@ -54,32 +54,62 @@ class NewsService:
         processed_articles = []
         
         for article in articles:
-            # Extract text for sentiment analysis
-            text = f"{article.get('title', '')} {article.get('description', '')}"
-            
-            # Perform sentiment analysis
-            blob = TextBlob(text)
-            sentiment = blob.sentiment.polarity
-            
-            # Categorize sentiment
-            if sentiment > 0.1:
-                sentiment_category = "Positive"
-            elif sentiment < -0.1:
-                sentiment_category = "Negative"
+            # Handle different API response formats
+            if isinstance(article, dict):
+                # NewsAPI format
+                title = article.get('title', '')
+                description = article.get('description', '') or article.get('summary', '')
+                url = article.get('url', '')
+                published = article.get('publishedAt', '')
+                source = article.get('source', {}).get('name', 'Unknown')
             else:
-                sentiment_category = "Neutral"
+                # Finnhub format
+                title = getattr(article, 'headline', '')
+                description = getattr(article, 'summary', '')
+                url = getattr(article, 'url', '')
+                published = datetime.fromtimestamp(getattr(article, 'datetime', 0)).isoformat()
+                source = getattr(article, 'source', 'Finnhub')
             
-            processed_articles.append({
-                'title': article.get('title', ''),
-                'description': article.get('description', ''),
-                'url': article.get('url', ''),
-                'publishedAt': article.get('publishedAt', ''),
-                'source': article.get('source', {}).get('name', 'Unknown'),
-                'sentiment': sentiment,
-                'sentiment_category': sentiment_category
-            })
+            # Skip articles with no content
+            if not title and not description:
+                continue
+                
+            # Combine text for sentiment analysis
+            text = f"{title} {description}"
+            
+            try:
+                # Perform sentiment analysis
+                blob = TextBlob(text)
+                sentiment = blob.sentiment.polarity
+                
+                # Categorize sentiment
+                if sentiment > 0.1:
+                    sentiment_category = "Positive"
+                elif sentiment < -0.1:
+                    sentiment_category = "Negative"
+                else:
+                    sentiment_category = "Neutral"
+                
+                processed_articles.append({
+                    'title': title,
+                    'summary': description,
+                    'url': url,
+                    'date': published,
+                    'source': source,
+                    'sentiment': sentiment,
+                    'sentiment_category': sentiment_category
+                })
+            except Exception as e:
+                print(f"Error processing article: {str(e)}")
+                continue
         
-        return pd.DataFrame(processed_articles)
+        # Create DataFrame and sort by date
+        df = pd.DataFrame(processed_articles)
+        if not df.empty:
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.sort_values('date', ascending=False)
+        
+        return df
     
     def get_peer_comparison(self, symbol):
         """Get peer comparison data"""
