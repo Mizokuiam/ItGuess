@@ -392,129 +392,158 @@ class PredictionService:
                 print("No data available")
                 return None
                 
+            print(f"Fetched {len(df)} days of data")
+            print("Data columns:", df.columns.tolist())
+            
             current_price = float(df['Close'].iloc[-1])
+            print(f"Current price: ${current_price:.2f}")
             
-            # Calculate technical indicators
-            # 1. RSI
-            rsi = self._calculate_rsi(df['Close'])
-            current_rsi = rsi.iloc[-1]
-            
-            # 2. MACD
-            macd_hist = self._calculate_macd(df['Close'])
-            current_macd = macd_hist.iloc[-1]
-            
-            # 3. Moving Averages
-            ma5 = df['Close'].rolling(window=5).mean()
-            ma20 = df['Close'].rolling(window=20).mean()
-            current_ma5 = ma5.iloc[-1]
-            current_ma20 = ma20.iloc[-1]
-            
-            # 4. Price Momentum
-            momentum = self._calculate_momentum(df['Close'])
-            current_momentum = momentum.iloc[-1]
-            
-            # 5. Bollinger Bands
-            bb_width = self._calculate_bollinger_bands(df['Close'])
-            current_bb = bb_width.iloc[-1]
-            
-            # 6. Volume Analysis
-            volume_ma5 = df['Volume'].rolling(window=5).mean()
-            current_volume = df['Volume'].iloc[-1]
-            volume_trend = current_volume / volume_ma5.iloc[-1] - 1
-            
-            # Analyze signals
-            signals = []
-            signal_strengths = []
-            
-            # RSI signals
-            if current_rsi < 30:
-                signals.append(1)  # Oversold - bullish
-                signal_strengths.append(1.5)
-            elif current_rsi > 70:
-                signals.append(-1)  # Overbought - bearish
-                signal_strengths.append(1.5)
-            else:
-                signals.append(0)
-                signal_strengths.append(1.0)
-            
-            # MACD signals
-            if current_macd > 0:
-                signals.append(1)  # Bullish
-                signal_strengths.append(1.2)
-            else:
-                signals.append(-1)  # Bearish
-                signal_strengths.append(1.2)
-            
-            # Moving Average signals
-            if current_ma5 > current_ma20:
-                signals.append(1)  # Golden cross - bullish
-                signal_strengths.append(1.3)
-            else:
-                signals.append(-1)  # Death cross - bearish
-                signal_strengths.append(1.3)
-            
-            # Momentum signals
-            if current_momentum > 0:
-                signals.append(1)
-                signal_strengths.append(1.1)
-            else:
-                signals.append(-1)
-                signal_strengths.append(1.1)
-            
-            # Volume trend signals
-            if volume_trend > 0.1:  # Volume increasing
-                signals.append(1)
-                signal_strengths.append(1.2)
-            elif volume_trend < -0.1:  # Volume decreasing
-                signals.append(-1)
-                signal_strengths.append(1.2)
-            else:
-                signals.append(0)
-                signal_strengths.append(1.0)
-            
-            # Calculate weighted signal
-            weighted_signal = sum(s * w for s, w in zip(signals, signal_strengths)) / sum(signal_strengths)
-            
-            # Convert signal to price prediction
-            # Scale the signal to a reasonable percentage change (-2% to +2%)
-            predicted_change = weighted_signal * 0.02
-            
-            # Calculate predicted price
-            predicted_price = current_price * (1 + predicted_change)
-            
-            # Calculate confidence intervals
-            confidence_range = abs(predicted_change) * 0.5
-            lower_bound = current_price * (1 + predicted_change - confidence_range)
-            upper_bound = current_price * (1 + predicted_change + confidence_range)
-            
-            print("\nTechnical Analysis Summary:")
-            print(f"Current Price: ${current_price:.2f}")
-            print(f"RSI: {current_rsi:.2f}")
-            print(f"MACD: {current_macd:.2f}")
-            print(f"MA5/MA20: {current_ma5:.2f}/{current_ma20:.2f}")
-            print(f"Momentum: {current_momentum:.2f}")
-            print(f"Volume Trend: {volume_trend:.2%}")
-            print(f"\nWeighted Signal: {weighted_signal:.2f}")
-            print(f"Predicted Change: {predicted_change:.2%}")
-            print(f"Predicted Price: ${predicted_price:.2f}")
-            print(f"Confidence Interval: ${lower_bound:.2f} to ${upper_bound:.2f}")
-            
-            predictions = {
-                'technical': float(predicted_price)
-            }
-            
-            self.confidence_intervals[symbol] = {
-                'technical': (float(lower_bound), float(upper_bound))
-            }
-            
-            return predictions
+            # Calculate technical indicators with error checking
+            try:
+                # 1. RSI
+                rsi = self._calculate_rsi(df['Close'])
+                current_rsi = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
+                print(f"RSI: {current_rsi:.2f}")
+                
+                # 2. MACD
+                macd_hist = self._calculate_macd(df['Close'])
+                current_macd = float(macd_hist.iloc[-1]) if not pd.isna(macd_hist.iloc[-1]) else 0
+                print(f"MACD: {current_macd:.2f}")
+                
+                # 3. Moving Averages
+                ma5 = df['Close'].rolling(window=5, min_periods=1).mean()
+                ma20 = df['Close'].rolling(window=20, min_periods=1).mean()
+                current_ma5 = float(ma5.iloc[-1])
+                current_ma20 = float(ma20.iloc[-1])
+                print(f"MA5: {current_ma5:.2f}, MA20: {current_ma20:.2f}")
+                
+                # 4. Price Momentum
+                momentum = self._calculate_momentum(df['Close'])
+                current_momentum = float(momentum.iloc[-1]) if not pd.isna(momentum.iloc[-1]) else 0
+                print(f"Momentum: {current_momentum:.2f}")
+                
+                # 5. Bollinger Bands
+                bb_width = self._calculate_bollinger_bands(df['Close'])
+                current_bb = float(bb_width.iloc[-1]) if not pd.isna(bb_width.iloc[-1]) else 1
+                print(f"BB Width: {current_bb:.2f}")
+                
+                # 6. Volume Analysis
+                volume_ma5 = df['Volume'].rolling(window=5, min_periods=1).mean()
+                current_volume = float(df['Volume'].iloc[-1])
+                volume_trend = (current_volume / float(volume_ma5.iloc[-1]) - 1) if not pd.isna(volume_ma5.iloc[-1]) and volume_ma5.iloc[-1] != 0 else 0
+                print(f"Volume trend: {volume_trend:.2%}")
+                
+                # Initialize signals with default weights
+                signals = []
+                signal_strengths = []
+                
+                print("\nAnalyzing signals...")
+                
+                # RSI signals
+                if current_rsi < 30:
+                    signals.append(1)  # Oversold - bullish
+                    signal_strengths.append(1.5)
+                    print("RSI indicates oversold (bullish)")
+                elif current_rsi > 70:
+                    signals.append(-1)  # Overbought - bearish
+                    signal_strengths.append(1.5)
+                    print("RSI indicates overbought (bearish)")
+                else:
+                    signals.append(0)
+                    signal_strengths.append(1.0)
+                    print("RSI is neutral")
+                
+                # MACD signals
+                if current_macd > 0:
+                    signals.append(1)  # Bullish
+                    signal_strengths.append(1.2)
+                    print("MACD is positive (bullish)")
+                else:
+                    signals.append(-1)  # Bearish
+                    signal_strengths.append(1.2)
+                    print("MACD is negative (bearish)")
+                
+                # Moving Average signals
+                if current_ma5 > current_ma20:
+                    signals.append(1)  # Golden cross - bullish
+                    signal_strengths.append(1.3)
+                    print("Moving averages show uptrend (bullish)")
+                else:
+                    signals.append(-1)  # Death cross - bearish
+                    signal_strengths.append(1.3)
+                    print("Moving averages show downtrend (bearish)")
+                
+                # Momentum signals
+                if current_momentum > 0:
+                    signals.append(1)
+                    signal_strengths.append(1.1)
+                    print("Momentum is positive (bullish)")
+                else:
+                    signals.append(-1)
+                    signal_strengths.append(1.1)
+                    print("Momentum is negative (bearish)")
+                
+                # Volume trend signals
+                if volume_trend > 0.1:  # Volume increasing
+                    signals.append(1)
+                    signal_strengths.append(1.2)
+                    print("Volume is increasing (bullish)")
+                elif volume_trend < -0.1:  # Volume decreasing
+                    signals.append(-1)
+                    signal_strengths.append(1.2)
+                    print("Volume is decreasing (bearish)")
+                else:
+                    signals.append(0)
+                    signal_strengths.append(1.0)
+                    print("Volume is stable (neutral)")
+                
+                print(f"\nSignals: {signals}")
+                print(f"Signal strengths: {signal_strengths}")
+                
+                # Calculate weighted signal
+                weighted_signal = sum(s * w for s, w in zip(signals, signal_strengths)) / sum(signal_strengths)
+                print(f"Weighted signal: {weighted_signal:.2f}")
+                
+                # Convert signal to price prediction
+                # Scale the signal to a reasonable percentage change (-2% to +2%)
+                predicted_change = weighted_signal * 0.02
+                
+                # Calculate predicted price
+                predicted_price = current_price * (1 + predicted_change)
+                
+                # Calculate confidence intervals
+                confidence_range = abs(predicted_change) * 0.5
+                lower_bound = current_price * (1 + predicted_change - confidence_range)
+                upper_bound = current_price * (1 + predicted_change + confidence_range)
+                
+                print(f"\nPrediction Summary:")
+                print(f"Current Price: ${current_price:.2f}")
+                print(f"Predicted Price: ${predicted_price:.2f}")
+                print(f"Predicted Change: {predicted_change:.2%}")
+                print(f"Confidence Interval: ${lower_bound:.2f} to ${upper_bound:.2f}")
+                
+                predictions = {
+                    'technical': float(predicted_price)
+                }
+                
+                self.confidence_intervals[symbol] = {
+                    'technical': (float(lower_bound), float(upper_bound))
+                }
+                
+                return predictions
+                
+            except Exception as e:
+                print(f"Error calculating technical indicators: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return None
             
         except Exception as e:
             print(f"Error in technical analysis: {str(e)}")
             import traceback
             traceback.print_exc()
             return None
-            
+    
     def predict(self, symbol, period='1d'):
         """Make predictions using technical analysis"""
         return self.predict_technical(symbol, period)
