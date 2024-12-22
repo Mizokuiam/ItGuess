@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 from services.technical_analysis import TechnicalAnalysisService
 from services.prediction import PredictionService
-from services.news_service import NewsService
 from plotly.subplots import make_subplots
 import requests
 from PIL import Image
@@ -251,23 +250,11 @@ def get_company_info(symbol):
 
 # Initialize services
 def get_services():
-    print("\nInitializing services...")
-    try:
-        ta_service = TechnicalAnalysisService()
-        print("Technical Analysis Service initialized")
-        
-        pred_service = PredictionService()
-        print("Prediction Service initialized")
-        
-        news_service = NewsService()
-        print("News Service initialized")
-        
-        return ta_service, pred_service, news_service
-    except Exception as e:
-        print(f"Error initializing services: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None, None, None
+    """Initialize all services"""
+    technical_analysis = TechnicalAnalysisService()
+    prediction_service = PredictionService()
+    
+    return technical_analysis, prediction_service
 
 # Initialize or refresh services
 current_time = datetime.now()
@@ -275,14 +262,19 @@ if 'services' not in st.session_state or \
    'last_service_refresh' not in st.session_state or \
    (current_time - st.session_state.last_service_refresh).total_seconds() > 3600:  # Refresh every hour
     print("\nRefreshing services...")
-    st.session_state.services = get_services()
+    technical_analysis, prediction_service = get_services()
+    st.session_state.services = {
+        'technical_analysis': technical_analysis,
+        'prediction': prediction_service
+    }
     st.session_state.last_service_refresh = current_time
     st.session_state.last_update = current_time
 
-technical_analysis, prediction_service, news_service = st.session_state.services
+technical_analysis = st.session_state.services['technical_analysis']
+prediction_service = st.session_state.services['prediction']
 
 # Validate services
-if None in st.session_state.services:
+if technical_analysis is None or prediction_service is None:
     st.error("Error initializing services. Please refresh the page.")
     st.stop()
 
@@ -306,11 +298,6 @@ with st.sidebar:
     <div class='feature-box'>
         <div class='feature-title'>📊 Live Charts</div>
         <div class='feature-desc'>Real-time interactive charts with customizable indicators and time periods.</div>
-    </div>
-    
-    <div class='feature-box'>
-        <div class='feature-title'>📰 Market Overview</div>
-        <div class='feature-desc'>Comprehensive market data including volume analysis and price trends.</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -380,7 +367,7 @@ if symbol:
                 st.markdown(f"<h1 class='gradient-text'>{symbol}</h1>", unsafe_allow_html=True)
 
         # Create tabs with animation
-        tab_names = ["Overview", "Technical Analysis", "Price Prediction", "News Sentiment", "Live Chart"]
+        tab_names = ["Overview", "Technical Analysis", "Price Prediction", "Live Chart"]
         tabs = st.tabs(tab_names)
 
         with tabs[0]:  # Overview Tab
@@ -503,50 +490,6 @@ if symbol:
                             st.info("No peer data available")
                     except Exception as e:
                         st.info("Peer comparison data not available")
-
-                # Third row: News Sentiment
-                st.subheader("News Sentiment Analysis")
-                company_name = info.get('longName', symbol)
-                news_df = news_service.get_company_news(symbol, company_name)
-                
-                if news_df is not None and not news_df.empty:
-                    # Sentiment distribution
-                    sentiment_counts = news_df['sentiment_category'].value_counts()
-                    
-                    col1, col2 = st.columns([1, 2])
-                    
-                    with col1:
-                        # Sentiment donut chart
-                        colors = {'Positive': 'green', 'Neutral': 'gray', 'Negative': 'red'}
-                        fig = go.Figure(data=[go.Pie(
-                            labels=sentiment_counts.index,
-                            values=sentiment_counts.values,
-                            hole=.3,
-                            marker_colors=[colors[cat] for cat in sentiment_counts.index]
-                        )])
-                        
-                        fig.update_layout(
-                            title="Sentiment Distribution",
-                            height=300
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with col2:
-                        # News list with sentiment
-                        for _, news in news_df.head(5).iterrows():
-                            sentiment_color = (
-                                "🟢" if news['sentiment_category'] == 'Positive'
-                                else "🔴" if news['sentiment_category'] == 'Negative'
-                                else "⚪"
-                            )
-                            st.markdown(f"{sentiment_color} **{news['title']}**")
-                            st.markdown(f"*Source: {news['source']} | {news['publishedAt']}*")
-                            with st.expander("Read more"):
-                                st.write(news['description'])
-                                st.markdown(f"[Read full article]({news['url']})")
-                else:
-                    st.info("No recent news available")
 
         with tabs[1]:  # Technical Analysis Tab
             with st.spinner("Calculating technical indicators..."):
@@ -718,89 +661,7 @@ if symbol:
                     import traceback
                     traceback.print_exc()
 
-        with tabs[3]:  # News Sentiment Tab
-            st.subheader("Recent News & Sentiment Analysis")
-            
-            with st.spinner("Fetching latest news..."):
-                try:
-                    # Use the company name from info, fallback to symbol if not available
-                    company_name = info.get('longName', symbol) if info else symbol
-                    news_df = news_service.get_company_news(symbol, company_name)
-                    
-                    if news_df is not None and not news_df.empty:
-                        # Display news articles in a modern card layout
-                        st.markdown("""
-                            <style>
-                            .news-card {
-                                padding: 1rem;
-                                border-radius: 0.5rem;
-                                border: 1px solid #e0e0e0;
-                                margin-bottom: 1rem;
-                                background: white;
-                                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                            }
-                            .news-title {
-                                color: #1e88e5;
-                                font-size: 1.1rem;
-                                font-weight: 600;
-                                margin-bottom: 0.5rem;
-                            }
-                            .news-meta {
-                                color: #666;
-                                font-size: 0.9rem;
-                                margin-bottom: 0.5rem;
-                            }
-                            .sentiment-positive {
-                                color: #4caf50;
-                                font-weight: 600;
-                            }
-                            .sentiment-negative {
-                                color: #f44336;
-                                font-weight: 600;
-                            }
-                            .sentiment-neutral {
-                                color: #757575;
-                                font-weight: 600;
-                            }
-                            </style>
-                        """, unsafe_allow_html=True)
-                        
-                        # Show total number of articles
-                        st.markdown(f"### Found {len(news_df)} Recent News Articles")
-                        
-                        # Display each news article
-                        for _, article in news_df.iterrows():
-                            sentiment_class = {
-                                'Positive': 'sentiment-positive',
-                                'Negative': 'sentiment-negative',
-                                'Neutral': 'sentiment-neutral'
-                            }.get(article['sentiment_category'], 'sentiment-neutral')
-                            
-                            st.markdown(f"""
-                                <div class="news-card">
-                                    <div class="news-title">
-                                        <a href="{article['url']}" target="_blank">{article['title']}</a>
-                                    </div>
-                                    <div class="news-meta">
-                                        Source: {article['source']} | 
-                                        Sentiment: <span class="{sentiment_class}">{article['sentiment_category']}</span>
-                                    </div>
-                                    <div>{article['summary']}</div>
-                                </div>
-                            """, unsafe_allow_html=True)
-                        
-                        # Show sentiment distribution in a small chart
-                        st.markdown("### Sentiment Distribution")
-                        sentiment_counts = news_df['sentiment_category'].value_counts()
-                        st.bar_chart(sentiment_counts)
-                        
-                    else:
-                        st.info("No recent news articles found for this company.")
-                        
-                except Exception as e:
-                    st.error(f"Error fetching news: {str(e)}")
-                    
-        with tabs[4]:  # Live Chart Tab
+        with tabs[3]:  # Live Chart Tab
             st.subheader("Live Chart Analysis")
             
             # Time period selection
