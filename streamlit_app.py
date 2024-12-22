@@ -236,8 +236,8 @@ if symbol:
                             with col1:
                                 rsi_val = indicators.get('RSI', 'N/A')
                                 if rsi_val != 'N/A':
-                                    rsi_color = 'red' if float(rsi_val) > 70 else 'green' if float(rsi_val) < 30 else 'normal'
-                                    st.metric("RSI", f"{rsi_val}", delta_color=rsi_color)
+                                    delta_color = 'inverse' if float(rsi_val) > 70 else 'normal' if float(rsi_val) < 30 else 'off'
+                                    st.metric("RSI", f"{rsi_val}", delta=" ", delta_color=delta_color)
                                 else:
                                     st.metric("RSI", "N/A")
                                 
@@ -361,9 +361,9 @@ if symbol:
                         # Update layout
                         fig.update_layout(
                             title=f'{symbol} Live Chart',
-                            yaxis_title='Price',
-                            yaxis2_title='Volume',
-                            yaxis3_title='RSI',
+                            yaxis=dict(title='Price'),
+                            yaxis2=dict(title='Volume', overlaying='y', side='right'),
+                            yaxis3=dict(title='RSI', domain=[0, 0.3]),
                             xaxis_rangeslider_visible=False,
                             height=800,
                             showlegend=True,
@@ -376,9 +376,9 @@ if symbol:
                             )
                         )
 
-                        # Update y-axes
-                        fig.update_yaxes(title_text="Price", row=1, col=1)
-                        fig.update_yaxes(title_text="RSI", row=2, col=1)
+                        # Update axes ranges
+                        fig.update_yaxes(title_text="Price", secondary_y=False, row=1, col=1)
+                        fig.update_yaxes(title_text="RSI", range=[0, 100], row=2, col=1)
 
                         # Display the chart
                         st.plotly_chart(fig, use_container_width=True)
