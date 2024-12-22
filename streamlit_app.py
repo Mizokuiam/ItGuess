@@ -28,6 +28,53 @@ st.markdown("""
             background-color: #ffffff;
         }
         
+        /* Title Styling */
+        .app-title {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 3.5em;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 0;
+            padding: 10px;
+            font-family: 'Segoe UI', sans-serif;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .app-subtitle {
+            color: #666666;
+            font-size: 1.2em;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 300;
+        }
+        
+        /* Feature Box Styling */
+        .feature-box {
+            background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .feature-title {
+            color: #333;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .feature-desc {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
         /* Header styling */
         h1 {
             font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -241,10 +288,33 @@ if None in st.session_state.services:
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<h1 class='gradient-text' style='text-align: center;'>ItGuess</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666666; margin-bottom: 2rem;'>Smart Stock Analysis</p>", unsafe_allow_html=True)
+    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
     
-    # Search box
+    # Features Description
+    st.markdown("""
+    <div class='feature-box'>
+        <div class='feature-title'>🎯 Technical Analysis</div>
+        <div class='feature-desc'>Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.</div>
+    </div>
+    
+    <div class='feature-box'>
+        <div class='feature-title'>📈 Price Prediction</div>
+        <div class='feature-desc'>AI-powered price predictions based on technical analysis and market patterns.</div>
+    </div>
+    
+    <div class='feature-box'>
+        <div class='feature-title'>📊 Live Charts</div>
+        <div class='feature-desc'>Real-time interactive charts with customizable indicators and time periods.</div>
+    </div>
+    
+    <div class='feature-box'>
+        <div class='feature-title'>📰 Market Overview</div>
+        <div class='feature-desc'>Comprehensive market data including volume analysis and price trends.</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Search box with improved styling
     st.markdown("<div class='search-container'>", unsafe_allow_html=True)
     symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT")
     st.markdown("</div>", unsafe_allow_html=True)
