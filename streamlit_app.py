@@ -380,20 +380,14 @@ if not symbol:  # Show welcome page when no symbol is entered
         </div>
     """, unsafe_allow_html=True)
     
-else:  # Show stock analysis when symbol is entered
+elif symbol:  # Show stock analysis when symbol is entered
     try:
         # Validate symbol and get info
         stock = yf.Ticker(symbol)
-        info = stock.info  # Get info once at the start
+        info = get_company_info(symbol)
         
-        # Try to fetch some basic data first
-        try:
-            hist = stock.history(period="1d")
-            if hist.empty:
-                st.error(f"No trading data available for symbol: {symbol}")
-                st.stop()
-        except Exception as e:
-            st.error(f"Error fetching data for {symbol}: {str(e)}")
+        if info is None:
+            st.error(f"Could not find stock with symbol: {symbol}")
             st.stop()
             
         # Load company info and logo
