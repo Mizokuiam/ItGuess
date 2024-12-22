@@ -1,253 +1,213 @@
 import yfinance as yf
+import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
-import pandas as pd
+import tensorflow as tf
+from scipy import stats
 
 class PredictionService:
     def __init__(self):
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
-        self.lstm_model = self._build_lstm_model()
-        self.rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-        self.lr_model = LinearRegression()
+        self.models = {}
+        self.scalers = {}
         self.metrics = {}
-        self.data = None
+        self.history = {}
+        self.confidence_intervals = {}
+        self.feature_importance = {}
         
-    def _build_lstm_model(self):
-        """Build and return the LSTM model"""
-        model = Sequential([
-            LSTM(50, return_sequences=True, input_shape=(60, 1)),
-            LSTM(50, return_sequences=False),
-            Dense(25),
-            Dense(1)
-        ])
-        model.compile(optimizer='adam', loss='mean_squared_error')
-        return model
-    
-    def prepare_data(self, data, lookback=60):
-        """Prepare data for models"""
+    def _prepare_data(self, symbol):
+        """Prepare data for prediction"""
         try:
-            if len(data) < lookback:
+            # Get historical data
+            stock = yf.Ticker(symbol)
+            df = stock.history(period="2y")
+            
+            if df.empty:
                 return None, None
                 
-            scaled_data = self.scaler.fit_transform(data.reshape(-1, 1))
-            x_train = []
-            y_train = []
+            # Calculate technical indicators
+            df['MA5'] = df['Close'].rolling(window=5).mean()
+            df['MA20'] = df['Close'].rolling(window=20).mean()
+            df['RSI'] = self._calculate_rsi(df['Close'])
+            df['Volume_MA'] = df['Volume'].rolling(window=5).mean()
+            df['Returns'] = df['Close'].pct_change()
+            df['Volatility'] = df['Returns'].rolling(window=20).std()
             
-            for i in range(lookback, len(scaled_data)):
-                x_train.append(scaled_data[i-lookback:i, 0])
-                y_train.append(scaled_data[i, 0])
-                
-            return np.array(x_train), np.array(y_train)
+            # Create features and target
+            df = df.dropna()
+            
+            features = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                       'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
+            
+            X = df[features].values
+            y = df['Close'].values
+            
+            # Scale the data
+            self.scalers[symbol] = MinMaxScaler()
+            X_scaled = self.scalers[symbol].fit_transform(X)
+            
+            return X_scaled, y
+            
         except Exception as e:
             print(f"Error preparing data: {str(e)}")
             return None, None
-
+    
+    def _calculate_rsi(self, prices, period=14):
+        """Calculate RSI"""
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs))
+    
     def train_models(self, symbol):
-        """Train all models with the given data"""
+        """Train prediction models"""
         try:
-            # Get historical data
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=365)
-            data = yf.download(symbol, start=start_date, end=end_date)['Close'].values
+            X, y = self._prepare_data(symbol)
             
-            if len(data) < 60:
+            if X is None or y is None:
                 return False
             
-            # Prepare data
-            x_train, y_train = self.prepare_data(data)
-            if x_train is None or y_train is None:
-                return False
-            
-            # Store data for later use
-            self.data = data
-            
-            # Train LSTM
-            x_train_lstm = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-            self.lstm_model.fit(x_train_lstm, y_train, epochs=10, batch_size=32, verbose=0)
-            lstm_pred = self.lstm_model.predict(x_train_lstm, verbose=0)
-            self.metrics['lstm_accuracy'] = float(r2_score(y_train, lstm_pred))
+            # Split data
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
             # Train Random Forest
-            x_train_rf = x_train.reshape(x_train.shape[0], -1)
-            self.rf_model.fit(x_train_rf, y_train)
-            rf_pred = self.rf_model.predict(x_train_rf)
-            self.metrics['rf_accuracy'] = float(r2_score(y_train, rf_pred))
+            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            rf_model.fit(X_train, y_train)
             
-            # Train Linear Regression
-            self.lr_model.fit(x_train_rf, y_train)
-            lr_pred = self.lr_model.predict(x_train_rf)
-            self.metrics['lr_accuracy'] = float(r2_score(y_train, lr_pred))
+            # Train Neural Network
+            nn_model = tf.keras.Sequential([
+                tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+                tf.keras.layers.Dropout(0.2),
+                tf.keras.layers.Dense(32, activation='relu'),
+                tf.keras.layers.Dropout(0.1),
+                tf.keras.layers.Dense(1)
+            ])
+            
+            nn_model.compile(optimizer='adam', loss='mse')
+            nn_model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=0)
+            
+            # Store models
+            self.models[symbol] = {
+                'rf': rf_model,
+                'nn': nn_model
+            }
+            
+            # Calculate metrics
+            self._calculate_metrics(symbol, X_test, y_test)
+            
+            # Store feature importance
+            self._calculate_feature_importance(symbol)
             
             return True
+            
         except Exception as e:
             print(f"Error training models: {str(e)}")
-            self.metrics = {
-                'lstm_accuracy': 0.0,
-                'rf_accuracy': 0.0,
-                'lr_accuracy': 0.0
-            }
             return False
+    
+    def _calculate_metrics(self, symbol, X_test, y_test):
+        """Calculate model performance metrics"""
+        metrics = {}
+        history = {'actual': [], 'rf_pred': [], 'nn_pred': []}
+        
+        for model_name, model in self.models[symbol].items():
+            y_pred = model.predict(X_test)
+            if model_name == 'nn':
+                y_pred = y_pred.flatten()
             
-    def get_prediction(self, symbol, period='1d'):
-        """Get price predictions from all models"""
-        try:
-            # Get historical data
-            stock = yf.Ticker(symbol)
-            hist = stock.history(period='3mo')
+            mse = mean_squared_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
             
-            if hist.empty:
-                raise ValueError(f"No historical data available for {symbol}")
-            
-            # Train models if needed
-            self.train_models(symbol)
-            
-            # Prepare latest data for prediction
-            latest_data = hist['Close'].values[-60:]
-            scaled_data = self.scaler.transform(latest_data.reshape(-1, 1))
-            
-            # Prepare data for different models
-            x_lstm = np.array([scaled_data])
-            x_lstm = np.reshape(x_lstm, (x_lstm.shape[0], x_lstm.shape[1], 1))
-            x_flat = scaled_data.reshape(1, -1)
-            
-            # Get predictions from all models
-            lstm_pred = self.scaler.inverse_transform(self.lstm_model.predict(x_lstm, verbose=0))[0][0]
-            rf_pred = self.scaler.inverse_transform([[self.rf_model.predict(x_flat)[0]]])[0][0]
-            lr_pred = self.scaler.inverse_transform([[self.lr_model.predict(x_flat)[0]]])[0][0]
-            
-            # Calculate ensemble prediction (weighted average)
-            weights = {'lstm': 0.5, 'rf': 0.3, 'lr': 0.2}
-            ensemble_pred = (
-                lstm_pred * weights['lstm'] +
-                rf_pred * weights['rf'] +
-                lr_pred * weights['lr']
-            )
-            
-            # Adjust prediction based on period
-            ensemble_pred = self._adjust_prediction(ensemble_pred, period)
-            
-            # Calculate confidence based on model performance
-            confidence = self._calculate_confidence()
-            
-            return {
-                'ensemble': round(ensemble_pred, 2),
-                'lstm': round(lstm_pred, 2),
-                'rf': round(rf_pred, 2),
-                'lr': round(lr_pred, 2),
-                'confidence': confidence,
-                'metrics': self.metrics,
-                'date': (datetime.now() + self._get_period_delta(period)).strftime('%Y-%m-%d')
+            metrics[model_name] = {
+                'mse': mse,
+                'r2': r2,
+                'rmse': np.sqrt(mse)
             }
             
-        except Exception as e:
-            print(f"Error making prediction: {str(e)}")
-            return self._get_fallback_prediction(symbol, period)
+            # Store predictions for history
+            history[f'{model_name}_pred'] = y_pred.tolist()
+        
+        history['actual'] = y_test.tolist()
+        
+        self.metrics[symbol] = metrics
+        self.history[symbol] = history
     
-    def _adjust_prediction(self, prediction, period):
-        """Adjust prediction based on the time period"""
-        adjustments = {
-            '1d': 1.0,
-            '1w': 1.02,
-            '1m': 1.05,
-            '3m': 1.10,
-            '6m': 1.15,
-            '1y': 1.20
-        }
-        return prediction * adjustments.get(period, 1.0)
+    def _calculate_feature_importance(self, symbol):
+        """Calculate and store feature importance"""
+        features = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                   'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
+        
+        rf_model = self.models[symbol]['rf']
+        importance = rf_model.feature_importances_
+        
+        self.feature_importance[symbol] = dict(zip(features, importance))
     
-    def _calculate_confidence(self):
-        """Calculate confidence score based on model performance"""
-        if not self.metrics:
-            return 85  # Default confidence
-            
-        # Use R² scores to calculate confidence
-        r2_scores = [
-            self.metrics['lstm_accuracy'],
-            self.metrics['rf_accuracy'],
-            self.metrics['lr_accuracy']
-        ]
-        avg_r2 = np.mean(r2_scores)
-        confidence = min(95, max(60, avg_r2 * 100))  # Scale between 60-95%
-        return round(confidence, 1)
-    
-    def _get_period_delta(self, period):
-        """Convert period string to timedelta"""
-        period_map = {
-            '1d': timedelta(days=1),
-            '1w': timedelta(weeks=1),
-            '1m': timedelta(days=30),
-            '3m': timedelta(days=90),
-            '6m': timedelta(days=180),
-            '1y': timedelta(days=365)
-        }
-        return period_map.get(period, timedelta(days=1))
-    
-    def _get_fallback_prediction(self, symbol, period):
-        """Provide a simple fallback prediction when models fail"""
+    def predict(self, symbol, period='1d'):
+        """Make predictions with confidence intervals"""
         try:
+            if symbol not in self.models:
+                return None
+            
+            # Get latest data
             stock = yf.Ticker(symbol)
-            hist = stock.history(period='5d')
-            if not hist.empty:
-                current_price = hist['Close'].iloc[-1]
-                avg_change = hist['Close'].pct_change().mean()
-                prediction = current_price * (1 + avg_change)
-                return {
-                    'ensemble': round(prediction, 2),
-                    'lstm': round(prediction, 2),
-                    'rf': round(prediction, 2),
-                    'lr': round(prediction, 2),
-                    'confidence': 60,
-                    'metrics': {},
-                    'date': (datetime.now() + self._get_period_delta(period)).strftime('%Y-%m-%d')
-                }
-        except:
-            pass
+            df = stock.history(period="60d")
             
-        return {
-            'ensemble': 0,
-            'lstm': 0,
-            'rf': 0,
-            'lr': 0,
-            'confidence': 0,
-            'metrics': {},
-            'date': datetime.now().strftime('%Y-%m-%d')
-        }
-    
-    def predict(self, period='1d'):
-        """Make predictions using all models"""
-        if not hasattr(self, 'data') or self.data is None:
-            return None
+            if df.empty:
+                return None
             
-        predictions = {}
-        try:
-            # Prepare latest data for prediction
-            latest_data = self.data[-60:]  # Get last 60 days
-            latest_data = self.scaler.transform(latest_data.reshape(-1, 1))
-            latest_data = latest_data.reshape(1, 60, 1)  # Reshape for LSTM
+            # Prepare features
+            df['MA5'] = df['Close'].rolling(window=5).mean()
+            df['MA20'] = df['Close'].rolling(window=20).mean()
+            df['RSI'] = self._calculate_rsi(df['Close'])
+            df['Volume_MA'] = df['Volume'].rolling(window=5).mean()
+            df['Returns'] = df['Close'].pct_change()
+            df['Volatility'] = df['Returns'].rolling(window=20).std()
             
-            # LSTM prediction
-            lstm_pred = self.lstm_model.predict(latest_data)
-            predictions['LSTM'] = float(self.scaler.inverse_transform(lstm_pred)[0, 0])
+            features = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                       'MA5', 'MA20', 'RSI', 'Volume_MA', 'Volatility']
             
-            # Random Forest prediction
-            rf_input = latest_data.reshape(1, -1)
-            rf_pred = self.rf_model.predict(rf_input)
-            predictions['Random Forest'] = float(self.scaler.inverse_transform([[rf_pred[0]]])[0, 0])
+            X = df[features].iloc[-1:].values
+            X_scaled = self.scalers[symbol].transform(X)
             
-            # Linear Regression prediction
-            lr_pred = self.lr_model.predict(rf_input)
-            predictions['Linear Regression'] = float(self.scaler.inverse_transform([[lr_pred[0]]])[0, 0])
+            predictions = {}
+            confidence_intervals = {}
             
-            # Ensemble prediction (average of all models)
-            predictions['Ensemble'] = sum(predictions.values()) / len(predictions)
+            # Make predictions with each model
+            for model_name, model in self.models[symbol].items():
+                if model_name == 'rf':
+                    # Random Forest prediction with confidence interval
+                    predictions_array = np.array([tree.predict(X_scaled) for tree in model.estimators_])
+                    pred = predictions_array.mean()
+                    conf_interval = stats.t.interval(0.95, len(predictions_array)-1,
+                                                   loc=pred,
+                                                   scale=stats.sem(predictions_array))
+                elif model_name == 'nn':
+                    # Neural Network prediction
+                    pred = model.predict(X_scaled).flatten()[0]
+                    # Estimate confidence interval using prediction std
+                    std = np.std([model.predict(X_scaled) for _ in range(100)])
+                    conf_interval = (pred - 1.96*std, pred + 1.96*std)
+                
+                predictions[model_name] = pred
+                confidence_intervals[model_name] = conf_interval
             
+            self.confidence_intervals[symbol] = confidence_intervals
             return predictions
+            
         except Exception as e:
             print(f"Error making predictions: {str(e)}")
             return None
+    
+    def get_prediction_history(self, symbol):
+        """Get prediction history"""
+        return self.history.get(symbol, None)
+    
+    def get_confidence_intervals(self, symbol):
+        """Get confidence intervals for predictions"""
+        return self.confidence_intervals.get(symbol, None)
+    
+    def get_feature_importance(self, symbol):
+        """Get feature importance scores"""
+        return self.feature_importance.get(symbol, None)

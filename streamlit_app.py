@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from services.technical_analysis import TechnicalAnalysisService
 from services.prediction import PredictionService
+from services.news import NewsService
 from plotly.subplots import make_subplots
 import requests
 from PIL import Image
@@ -219,9 +220,12 @@ def get_company_info(symbol):
 # Initialize services
 @st.cache_resource
 def get_services():
-    return TechnicalAnalysisService(), PredictionService()
+    technical_analysis = TechnicalAnalysisService()
+    prediction_service = PredictionService()
+    news_service = NewsService()
+    return technical_analysis, prediction_service, news_service
 
-technical_analysis, prediction_service = get_services()
+technical_analysis, prediction_service, news_service = get_services()
 
 # Sidebar
 with st.sidebar:
@@ -318,13 +322,7 @@ if symbol:
 
         with tabs[0]:  # Overview Tab
             with st.container():
-                # Company Description
-                if company_info and company_info['description'] != 'N/A':
-                    with st.expander("About the Company", expanded=True):
-                        st.markdown(f"<div class='company-description'>{company_info['description']}</div>",
-                                  unsafe_allow_html=True)
-                
-                # Quick Stats
+                # Quick Stats in first row
                 st.subheader("Quick Stats")
                 try:
                     stock = yf.Ticker(symbol)
@@ -332,19 +330,16 @@ if symbol:
                     
                     col1, col2, col3, col4 = st.columns(4)
                     
-                    # Market Cap
                     with col1:
                         market_cap = info.get('marketCap', 0)
                         market_cap_str = f"${market_cap/1e9:.2f}B" if market_cap >= 1e9 else f"${market_cap/1e6:.2f}M"
                         st.metric("Market Cap", market_cap_str)
                     
-                    # P/E Ratio
                     with col2:
                         pe_ratio = info.get('trailingPE', 'N/A')
                         pe_ratio = f"{pe_ratio:.2f}" if isinstance(pe_ratio, (int, float)) else pe_ratio
                         st.metric("P/E Ratio", pe_ratio)
                     
-                    # 52W Range
                     with col3:
                         high_52w = info.get('fiftyTwoWeekHigh', 0)
                         low_52w = info.get('fiftyTwoWeekLow', 0)
@@ -354,7 +349,6 @@ if symbol:
                             range_52w = "N/A"
                         st.metric("52W Range", range_52w)
                     
-                    # Volume
                     with col4:
                         volume = info.get('volume', 0)
                         volume_str = f"{volume/1e6:.1f}M" if volume >= 1e6 else f"{volume/1e3:.1f}K"
@@ -362,262 +356,679 @@ if symbol:
                 
                 except Exception as e:
                     st.error(f"Error loading stock information: {str(e)}")
+
+                # Second row: Price Movement and Peer Comparison
+                col1, col2 = st.columns([3, 2])
                 
-                # Price Movement Chart
-                st.subheader("Price Movement")
-                try:
-                    hist = stock.history(period="6mo")
-                    fig = go.Figure(data=[
-                        go.Candlestick(
-                            x=hist.index,
-                            open=hist['Open'],
-                            high=hist['High'],
-                            low=hist['Low'],
-                            close=hist['Close'],
-                            name='Price'
+                with col1:
+                    st.subheader("Price Movement")
+                    try:
+                        hist = stock.history(period="6mo")
+                        fig = go.Figure(data=[
+                            go.Candlestick(
+                                x=hist.index,
+                                open=hist['Open'],
+                                high=hist['High'],
+                                low=hist['Low'],
+                                close=hist['Close'],
+                                name='Price'
+                            )
+                        ])
+                        
+                        fig.update_layout(
+                            title=f"{symbol} 6-Month Price Movement",
+                            yaxis_title="Price",
+                            xaxis_title="Date",
+                            height=400,
+                            template='plotly_dark' if st.session_state.theme == 'dark' else 'plotly_white'
                         )
-                    ])
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                    except Exception as e:
+                        st.error(f"Error creating price movement chart: {str(e)}")
+                
+                with col2:
+                    st.subheader("Peer Comparison")
+                    peer_data = news_service.get_peer_comparison(symbol)
+                    if peer_data is not None:
+                        # Create radar chart for peer comparison
+                        metrics = ['pe_ratio', 'price_to_sales', 'price_to_book', 'debt_to_equity']
+                        fig = go.Figure()
+                        
+                        for idx, row in peer_data.iterrows():
+                            fig.add_trace(go.Scatterpolar(
+                                r=[row[m] for m in metrics],
+                                theta=metrics,
+                                fill='toself',
+                                name=row['symbol']
+                            ))
+                            
+                        fig.update_layout(
+                            polar=dict(
+                                radialaxis=dict(
+                                    visible=True,
+                                    range=[0, peer_data[metrics].max().max()]
+                                )),
+                            showlegend=True,
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("Peer comparison data not available")
+
+                # Third row: News Sentiment
+                st.subheader("News Sentiment Analysis")
+                news_df = news_service.get_company_news(symbol, company_info['name'] if company_info else symbol)
+                
+                if news_df is not None and not news_df.empty:
+                    # Sentiment distribution
+                    sentiment_counts = news_df['sentiment_category'].value_counts()
                     
-                    fig.update_layout(
-                        title=f"{symbol} 6-Month Price Movement",
-                        yaxis_title="Price",
-                        xaxis_title="Date",
-                        height=400,
-                        template='plotly_dark' if st.session_state.theme == 'dark' else 'plotly_white'
-                    )
+                    col1, col2 = st.columns([1, 2])
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    with col1:
+                        # Sentiment donut chart
+                        colors = {'Positive': 'green', 'Neutral': 'gray', 'Negative': 'red'}
+                        fig = go.Figure(data=[go.Pie(
+                            labels=sentiment_counts.index,
+                            values=sentiment_counts.values,
+                            hole=.3,
+                            marker_colors=[colors[cat] for cat in sentiment_counts.index]
+                        )])
+                        
+                        fig.update_layout(
+                            title="Sentiment Distribution",
+                            height=300
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
                     
-                except Exception as e:
-                    st.error(f"Error creating price movement chart: {str(e)}")
+                    with col2:
+                        # News list with sentiment
+                        for _, news in news_df.head(5).iterrows():
+                            sentiment_color = (
+                                "🟢" if news['sentiment_category'] == 'Positive'
+                                else "🔴" if news['sentiment_category'] == 'Negative'
+                                else "⚪"
+                            )
+                            st.markdown(f"{sentiment_color} **{news['title']}**")
+                            st.markdown(f"*Source: {news['source']} | {news['publishedAt']}*")
+                            with st.expander("Read more"):
+                                st.write(news['description'])
+                                st.markdown(f"[Read full article]({news['url']})")
+                else:
+                    st.info("No recent news available")
 
         with tabs[1]:  # Technical Analysis Tab
             with st.spinner("Calculating technical indicators..."):
                 # Get technical analysis data
-                technical_analysis.fetch_data(symbol)
-                indicators = technical_analysis.calculate_indicators()
+                analysis_data = technical_analysis.analyze(symbol)
                 
-                if indicators:
-                    # Technical Indicators Overview
-                    st.subheader("Technical Indicators")
-                    
-                    # Create three columns for different types of indicators
-                    momentum_col, trend_col, volume_col = st.columns(3)
-                    
-                    with momentum_col:
-                        st.markdown("##### Momentum Indicators")
-                        # RSI
-                        rsi_val = indicators.get('RSI', 'N/A')
-                        if rsi_val != 'N/A':
-                            rsi_color = 'inverse' if float(rsi_val) > 70 else 'normal' if float(rsi_val) < 30 else 'off'
-                            st.metric("RSI (14)", f"{rsi_val}", 
-                                    delta="Overbought" if float(rsi_val) > 70 else "Oversold" if float(rsi_val) < 30 else " ",
-                                    delta_color=rsi_color)
-                            
-                            # RSI Gauge Chart
-                            fig = go.Figure(go.Indicator(
-                                mode="gauge+number",
-                                value=float(rsi_val),
-                                domain={'x': [0, 1], 'y': [0, 1]},
-                                gauge={
-                                    'axis': {'range': [0, 100]},
-                                    'bar': {'color': "#1E88E5"},
-                                    'steps': [
-                                        {'range': [0, 30], 'color': "lightgreen"},
-                                        {'range': [30, 70], 'color': "lightgray"},
-                                        {'range': [70, 100], 'color': "lightcoral"}
-                                    ]
-                                }
-                            ))
-                            fig.update_layout(height=200, margin=dict(l=10, r=10, t=30, b=10))
-                            st.plotly_chart(fig, use_container_width=True)
+                if analysis_data is not None:
+                    # Create three columns for different indicator categories
+                    trend_col, momentum_col, volume_col = st.columns(3)
                     
                     with trend_col:
-                        st.markdown("##### Trend Indicators")
-                        # MACD
-                        macd_val = indicators.get('MACD', 'N/A')
-                        signal_val = indicators.get('Signal', 'N/A')
-                        if macd_val != 'N/A' and signal_val != 'N/A':
-                            macd_signal_diff = float(macd_val) - float(signal_val)
-                            st.metric("MACD", f"{macd_val}", 
-                                    delta=f"{macd_signal_diff:.2f}",
-                                    delta_color="normal" if macd_signal_diff > 0 else "inverse")
+                        st.subheader("Trend Indicators")
                         
-                        # Moving Averages
-                        ema20 = indicators.get('EMA20', 'N/A')
-                        ema50 = indicators.get('EMA50', 'N/A')
-                        if ema20 != 'N/A' and ema50 != 'N/A':
-                            ma_diff = float(ema20) - float(ema50)
-                            st.metric("EMA Cross", f"EMA20: {ema20}",
-                                    delta=f"vs EMA50: {ma_diff:.2f}",
-                                    delta_color="normal" if ma_diff > 0 else "inverse")
+                        # MA Cross
+                        ma_data = analysis_data['ma_cross']
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            y=ma_data['MA20'][-30:],
+                            name='MA20',
+                            line=dict(color='blue')
+                        ))
+                        fig.add_trace(go.Scatter(
+                            y=ma_data['MA50'][-30:],
+                            name='MA50',
+                            line=dict(color='orange')
+                        ))
+                        fig.update_layout(
+                            height=100,
+                            margin=dict(l=0, r=0, t=0, b=0),
+                            showlegend=False
+                        )
+                        st.metric(
+                            "MA Cross",
+                            ma_data['signal'],
+                            delta="Bullish" if ma_data['signal'] == "Buy" else "Bearish" if ma_data['signal'] == "Sell" else None,
+                            delta_color="normal"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # MACD
+                        macd_data = analysis_data['macd']
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            y=macd_data['MACD'][-30:],
+                            name='MACD',
+                            line=dict(color='blue')
+                        ))
+                        fig.add_trace(go.Scatter(
+                            y=macd_data['Signal'][-30:],
+                            name='Signal',
+                            line=dict(color='orange')
+                        ))
+                        fig.update_layout(
+                            height=100,
+                            margin=dict(l=0, r=0, t=0, b=0),
+                            showlegend=False
+                        )
+                        st.metric(
+                            "MACD",
+                            macd_data['signal'],
+                            delta="Bullish" if macd_data['signal'] == "Buy" else "Bearish" if macd_data['signal'] == "Sell" else None
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with momentum_col:
+                        st.subheader("Momentum Indicators")
+                        
+                        # RSI
+                        rsi_data = analysis_data['rsi']
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            y=rsi_data['RSI'][-30:],
+                            line=dict(color='purple')
+                        ))
+                        fig.add_hline(y=70, line_dash="dash", line_color="red")
+                        fig.add_hline(y=30, line_dash="dash", line_color="green")
+                        fig.update_layout(
+                            height=100,
+                            margin=dict(l=0, r=0, t=0, b=0),
+                            showlegend=False
+                        )
+                        st.metric(
+                            "RSI",
+                            f"{rsi_data['value']:.1f}",
+                            delta="Overbought" if rsi_data['value'] > 70 else "Oversold" if rsi_data['value'] < 30 else "Neutral"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Stochastic
+                        stoch_data = analysis_data['stochastic']
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            y=stoch_data['K'][-30:],
+                            name='%K',
+                            line=dict(color='blue')
+                        ))
+                        fig.add_trace(go.Scatter(
+                            y=stoch_data['D'][-30:],
+                            name='%D',
+                            line=dict(color='orange')
+                        ))
+                        fig.add_hline(y=80, line_dash="dash", line_color="red")
+                        fig.add_hline(y=20, line_dash="dash", line_color="green")
+                        fig.update_layout(
+                            height=100,
+                            margin=dict(l=0, r=0, t=0, b=0),
+                            showlegend=False
+                        )
+                        st.metric(
+                            "Stochastic",
+                            stoch_data['signal'],
+                            delta="Bullish" if stoch_data['signal'] == "Buy" else "Bearish" if stoch_data['signal'] == "Sell" else None
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     with volume_col:
-                        st.markdown("##### Volume Analysis")
-                        # Volume
-                        volume = indicators.get('Volume', 'N/A')
-                        if volume != 'N/A':
-                            volume_str = f"{int(volume):,}"
-                            st.metric("Volume", volume_str)
+                        st.subheader("Volume Indicators")
                         
-                        # Bollinger Bands
-                        bb_upper = indicators.get('BB_Upper', 'N/A')
-                        bb_lower = indicators.get('BB_Lower', 'N/A')
-                        if bb_upper != 'N/A' and bb_lower != 'N/A':
-                            bb_width = float(bb_upper) - float(bb_lower)
-                            st.metric("BB Width", f"{bb_width:.2f}")
+                        # OBV
+                        obv_data = analysis_data['obv']
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            y=obv_data['OBV'][-30:],
+                            line=dict(color='green')
+                        ))
+                        fig.update_layout(
+                            height=100,
+                            margin=dict(l=0, r=0, t=0, b=0),
+                            showlegend=False
+                        )
+                        st.metric(
+                            "On-Balance Volume",
+                            obv_data['signal'],
+                            delta="Increasing" if obv_data['trend'] == "up" else "Decreasing" if obv_data['trend'] == "down" else None
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Volume
+                        volume_data = analysis_data['volume']
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            y=volume_data['Volume'][-30:],
+                            marker_color='lightblue'
+                        ))
+                        fig.add_trace(go.Scatter(
+                            y=volume_data['MA20'][-30:],
+                            line=dict(color='red')
+                        ))
+                        fig.update_layout(
+                            height=100,
+                            margin=dict(l=0, r=0, t=0, b=0),
+                            showlegend=False
+                        )
+                        st.metric(
+                            "Volume Analysis",
+                            volume_data['signal'],
+                            delta="Above Average" if volume_data['trend'] == "up" else "Below Average" if volume_data['trend'] == "down" else "Average"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     # Technical Analysis Summary
-                    st.subheader("Analysis Summary")
+                    st.subheader("Technical Analysis Summary")
+                    signals = [
+                        analysis_data['ma_cross']['signal'],
+                        analysis_data['macd']['signal'],
+                        analysis_data['rsi']['signal'],
+                        analysis_data['stochastic']['signal'],
+                        analysis_data['obv']['signal']
+                    ]
                     
-                    # Generate analysis text based on indicators
-                    summary_text = ""
-                    if rsi_val != 'N/A':
-                        if float(rsi_val) > 70:
-                            summary_text += "- RSI indicates **overbought** conditions. Consider taking profits.\n"
-                        elif float(rsi_val) < 30:
-                            summary_text += "- RSI indicates **oversold** conditions. Watch for potential reversal.\n"
+                    buy_signals = sum(1 for s in signals if s == "Buy")
+                    sell_signals = sum(1 for s in signals if s == "Sell")
                     
-                    if macd_val != 'N/A' and signal_val != 'N/A':
-                        if float(macd_val) > float(signal_val):
-                            summary_text += "- MACD shows **bullish** momentum.\n"
-                        else:
-                            summary_text += "- MACD shows **bearish** momentum.\n"
+                    summary = (
+                        "Strong Buy" if buy_signals >= 4 else
+                        "Buy" if buy_signals > sell_signals else
+                        "Strong Sell" if sell_signals >= 4 else
+                        "Sell" if sell_signals > buy_signals else
+                        "Neutral"
+                    )
                     
-                    if ema20 != 'N/A' and ema50 != 'N/A':
-                        if float(ema20) > float(ema50):
-                            summary_text += "- Moving averages indicate an **upward** trend.\n"
-                        else:
-                            summary_text += "- Moving averages indicate a **downward** trend.\n"
+                    st.metric(
+                        "Overall Signal",
+                        summary,
+                        delta=f"{buy_signals} Buy vs {sell_signals} Sell signals"
+                    )
                     
-                    st.markdown(summary_text)
-                
                 else:
-                    st.error("Unable to calculate technical indicators. Please try again.")
+                    st.error("Unable to calculate technical indicators")
         
         with tabs[2]:  # Price Prediction Tab
-            # Price Prediction
-            with st.spinner('Generating price predictions...'):
-                st.header("Price Prediction")
-                
-                try:
-                    # Train prediction models
-                    if prediction_service.train_models(symbol):
-                        # Make predictions
-                        predictions = prediction_service.predict(period)
+            with st.spinner("Training prediction models..."):
+                # Train models if needed
+                if prediction_service.train_models(symbol):
+                    predictions = prediction_service.predict(symbol)
+                    confidence_intervals = prediction_service.get_confidence_intervals(symbol)
+                    feature_importance = prediction_service.get_feature_importance(symbol)
+                    prediction_history = prediction_service.get_prediction_history(symbol)
+                    
+                    if predictions and confidence_intervals:
+                        st.subheader("Price Predictions")
                         
-                        if predictions and isinstance(predictions, dict):
-                            col1, col2 = st.columns([2, 1])
-                            with col1:
-                                st.subheader("Price Predictions")
-                                for model, pred in predictions.items():
-                                    if isinstance(pred, (int, float)):
-                                        st.metric(f"{model} Prediction", f"${pred:.2f}")
-                                    else:
-                                        st.metric(f"{model} Prediction", "N/A")
+                        # Create columns for each model's prediction
+                        rf_col, nn_col = st.columns(2)
+                        
+                        with rf_col:
+                            st.markdown("##### Random Forest Model")
+                            rf_pred = predictions['rf']
+                            rf_ci = confidence_intervals['rf']
                             
-                            with col2:
-                                st.subheader("Model Metrics")
-                                metrics = prediction_service.metrics
-                                if metrics and isinstance(metrics, dict):
-                                    for model, metric in metrics.items():
-                                        if isinstance(metric, (int, float)):
-                                            st.metric(f"{model} Accuracy", f"{metric:.1%}")
-                                        else:
-                                            st.metric(f"{model} Accuracy", "N/A")
-                                else:
-                                    st.warning("Model metrics not available")
-                        else:
-                            st.warning("Could not generate predictions. Please try again.")
+                            # Display prediction with confidence interval
+                            st.metric(
+                                "Predicted Price",
+                                f"${rf_pred:.2f}",
+                                delta=f"CI: ${rf_ci[0]:.2f} to ${rf_ci[1]:.2f}"
+                            )
+                            
+                            # Feature importance plot
+                            if feature_importance:
+                                fig = go.Figure(go.Bar(
+                                    x=list(feature_importance.values()),
+                                    y=list(feature_importance.keys()),
+                                    orientation='h'
+                                ))
+                                fig.update_layout(
+                                    title="Feature Importance",
+                                    height=300,
+                                    margin=dict(l=0, r=0, t=30, b=0)
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+                        
+                        with nn_col:
+                            st.markdown("##### Neural Network Model")
+                            nn_pred = predictions['nn']
+                            nn_ci = confidence_intervals['nn']
+                            
+                            # Display prediction with confidence interval
+                            st.metric(
+                                "Predicted Price",
+                                f"${nn_pred:.2f}",
+                                delta=f"CI: ${nn_ci[0]:.2f} to ${nn_ci[1]:.2f}"
+                            )
+                            
+                            # Model performance metrics
+                            metrics = prediction_service.metrics.get(symbol, {}).get('nn', {})
+                            if metrics:
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.metric("RMSE", f"${metrics['rmse']:.2f}")
+                                with col2:
+                                    st.metric("R² Score", f"{metrics['r2']:.3f}")
+                        
+                        # Prediction History
+                        if prediction_history:
+                            st.subheader("Prediction History")
+                            
+                            # Create prediction history plot
+                            fig = go.Figure()
+                            
+                            # Actual prices
+                            fig.add_trace(go.Scatter(
+                                y=prediction_history['actual'],
+                                name='Actual Price',
+                                line=dict(color='black')
+                            ))
+                            
+                            # RF predictions
+                            fig.add_trace(go.Scatter(
+                                y=prediction_history['rf_pred'],
+                                name='RF Predictions',
+                                line=dict(color='blue', dash='dash')
+                            ))
+                            
+                            # NN predictions
+                            fig.add_trace(go.Scatter(
+                                y=prediction_history['nn_pred'],
+                                name='NN Predictions',
+                                line=dict(color='red', dash='dash')
+                            ))
+                            
+                            fig.update_layout(
+                                title="Model Predictions vs Actual Prices",
+                                xaxis_title="Time",
+                                yaxis_title="Price",
+                                height=400,
+                                template='plotly_dark' if st.session_state.theme == 'dark' else 'plotly_white'
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Prediction Accuracy Metrics
+                            st.subheader("Model Performance")
+                            metrics = prediction_service.metrics.get(symbol, {})
+                            
+                            if metrics:
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    st.markdown("##### Random Forest Metrics")
+                                    rf_metrics = metrics.get('rf', {})
+                                    st.metric("RMSE", f"${rf_metrics.get('rmse', 0):.2f}")
+                                    st.metric("R² Score", f"{rf_metrics.get('r2', 0):.3f}")
+                                
+                                with col2:
+                                    st.markdown("##### Neural Network Metrics")
+                                    nn_metrics = metrics.get('nn', {})
+                                    st.metric("RMSE", f"${nn_metrics.get('rmse', 0):.2f}")
+                                    st.metric("R² Score", f"{nn_metrics.get('r2', 0):.3f}")
                     else:
-                        st.warning("Could not train prediction models. Not enough data points.")
-                except Exception as e:
-                    st.error(f"Error in price prediction: {str(e)}")
+                        st.error("Unable to generate predictions")
+                else:
+                    st.error("Unable to train prediction models")
         
         with tabs[3]:  # Live Chart Tab
-            # Live Chart with Technical Analysis
-            st.header("Live Chart")
+            st.subheader("Live Chart Analysis")
             
-            try:
-                # Get periods from session state
-                rsi_period = st.session_state.get('rsi_period', 14)
-                ma_period = st.session_state.get('ma_period', 20)
-                
-                # Create technical analysis instance with current data
-                ta_service = TechnicalAnalysisService(symbol=symbol, data=hist.copy())
-                
-                # Calculate indicators
-                rsi = ta_service.calculate_rsi(period=rsi_period)
-                indicators = ta_service.calculate_indicators()
-                
-                # Create figure with secondary y-axis
-                fig = make_subplots(rows=2, cols=1, 
-                                  shared_xaxes=True,  
-                                  vertical_spacing=0.03, 
-                                  row_heights=[0.7, 0.3],
-                                  subplot_titles=('Price', 'RSI'))
-
-                # Add candlestick
-                fig.add_trace(go.Candlestick(x=hist.index,
-                                            open=hist['Open'],
-                                            high=hist['High'],
-                                            low=hist['Low'],
-                                            close=hist['Close'],
-                                            name='OHLC'),
-                            row=1, col=1)
-
-                # Add Volume as bar chart
-                colors = ['red' if row['Open'] - row['Close'] >= 0 
-                        else 'green' for index, row in hist.iterrows()]
-                
-                fig.add_trace(go.Bar(x=hist.index, 
-                                   y=hist['Volume'],
-                                   name='Volume',
-                                   marker_color=colors,
-                                   opacity=0.3),
-                            row=1, col=1)
-
-                # Add RSI
-                if rsi is not None:
-                    fig.add_trace(go.Scatter(x=hist.index, 
-                                           y=rsi,
-                                           name='RSI',
-                                           line=dict(color='purple')),
-                                row=2, col=1)
-                    
-                    # Add RSI reference lines
-                    fig.add_hline(y=70, line_width=1, line_dash="dash", line_color="red", 
-                                row=2, col=1)
-                    fig.add_hline(y=30, line_width=1, line_dash="dash", line_color="green", 
-                                row=2, col=1)
-
-                # Update layout
-                fig.update_layout(
-                    title=f'{symbol} Live Chart',
-                    yaxis=dict(title='Price'),
-                    yaxis2=dict(title='Volume', overlaying='y', side='right'),
-                    yaxis3=dict(title='RSI', domain=[0, 0.3]),
-                    xaxis_rangeslider_visible=False,
-                    height=800,
-                    showlegend=True,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1
-                    )
+            # Time period selection
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                period_options = {
+                    '1D': '1d',
+                    '5D': '5d',
+                    '1M': '1mo',
+                    '3M': '3mo',
+                    '6M': '6mo',
+                    '1Y': '1y',
+                    '2Y': '2y',
+                    'YTD': 'ytd'
+                }
+                selected_period = st.select_slider(
+                    "Select Time Period",
+                    options=list(period_options.keys()),
+                    value='3M'
                 )
-
-                # Update axes ranges
-                fig.update_yaxes(title_text="Price", secondary_y=False, row=1, col=1)
-                fig.update_yaxes(title_text="RSI", range=[0, 100], row=2, col=1)
-
-                # Display the chart
-                st.plotly_chart(fig, use_container_width=True)
-                
-            except Exception as e:
-                st.error(f"Error creating live chart: {str(e)}")
+                period = period_options[selected_period]
+            
+            with col2:
+                interval_options = {
+                    '1 Minute': '1m',
+                    '5 Minutes': '5m',
+                    '15 Minutes': '15m',
+                    '30 Minutes': '30m',
+                    '1 Hour': '1h',
+                    'Daily': '1d',
+                    'Weekly': '1wk',
+                    'Monthly': '1mo'
+                }
+                selected_interval = st.selectbox(
+                    "Select Interval",
+                    options=list(interval_options.keys()),
+                    index=5  # Default to Daily
+                )
+                interval = interval_options[selected_interval]
+            
+            with col3:
+                # Theme toggle for the chart
+                chart_theme = st.selectbox(
+                    "Chart Theme",
+                    options=['Light', 'Dark'],
+                    index=1 if st.session_state.theme == 'dark' else 0
+                )
+            
+            # Get stock data
+            with st.spinner("Loading chart data..."):
+                try:
+                    stock = yf.Ticker(symbol)
+                    data = stock.history(period=period, interval=interval)
+                    
+                    if not data.empty:
+                        # Technical indicators selection
+                        st.markdown("### Technical Indicators")
+                        indicator_cols = st.columns(4)
+                        
+                        with indicator_cols[0]:
+                            show_ma = st.checkbox("Moving Averages", value=True)
+                            if show_ma:
+                                ma_periods = st.multiselect(
+                                    "MA Periods",
+                                    options=[5, 10, 20, 50, 100, 200],
+                                    default=[20, 50]
+                                )
+                        
+                        with indicator_cols[1]:
+                            show_bb = st.checkbox("Bollinger Bands")
+                            if show_bb:
+                                bb_period = st.number_input("BB Period", value=20, min_value=5, max_value=50)
+                                bb_std = st.number_input("BB Std Dev", value=2, min_value=1, max_value=4)
+                        
+                        with indicator_cols[2]:
+                            show_rsi = st.checkbox("RSI")
+                            if show_rsi:
+                                rsi_period = st.number_input("RSI Period", value=14, min_value=5, max_value=30)
+                        
+                        with indicator_cols[3]:
+                            show_volume = st.checkbox("Volume", value=True)
+                        
+                        # Create the main chart
+                        fig = make_subplots(
+                            rows=2 if show_volume else 1,
+                            cols=1,
+                            shared_xaxes=True,
+                            vertical_spacing=0.05,
+                            row_heights=[0.7, 0.3] if show_volume else [1]
+                        )
+                        
+                        # Add candlestick chart
+                        fig.add_trace(
+                            go.Candlestick(
+                                x=data.index,
+                                open=data['Open'],
+                                high=data['High'],
+                                low=data['Low'],
+                                close=data['Close'],
+                                name='Price'
+                            ),
+                            row=1, col=1
+                        )
+                        
+                        # Add Moving Averages
+                        if show_ma:
+                            for period in ma_periods:
+                                ma = data['Close'].rolling(window=period).mean()
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=data.index,
+                                        y=ma,
+                                        name=f'MA{period}',
+                                        line=dict(width=1)
+                                    ),
+                                    row=1, col=1
+                                )
+                        
+                        # Add Bollinger Bands
+                        if show_bb:
+                            bb_ma = data['Close'].rolling(window=bb_period).mean()
+                            bb_std = data['Close'].rolling(window=bb_period).std()
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=data.index,
+                                    y=bb_ma + (bb_std * 2),
+                                    name='BB Upper',
+                                    line=dict(dash='dash', width=1)
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=data.index,
+                                    y=bb_ma - (bb_std * 2),
+                                    name='BB Lower',
+                                    line=dict(dash='dash', width=1),
+                                    fill='tonexty'
+                                ),
+                                row=1, col=1
+                            )
+                        
+                        # Add RSI
+                        if show_rsi:
+                            delta = data['Close'].diff()
+                            gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
+                            loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
+                            rs = gain / loss
+                            rsi = 100 - (100 / (1 + rs))
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=data.index,
+                                    y=rsi,
+                                    name='RSI',
+                                    line=dict(color='purple')
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            # Add RSI reference lines
+                            fig.add_hline(y=70, line_dash="dash", line_color="red", row=1)
+                            fig.add_hline(y=30, line_dash="dash", line_color="green", row=1)
+                        
+                        # Add Volume
+                        if show_volume:
+                            colors = ['red' if close < open else 'green'
+                                    for close, open in zip(data['Close'], data['Open'])]
+                            
+                            fig.add_trace(
+                                go.Bar(
+                                    x=data.index,
+                                    y=data['Volume'],
+                                    name='Volume',
+                                    marker_color=colors
+                                ),
+                                row=2, col=1
+                            )
+                        
+                        # Update layout
+                        fig.update_layout(
+                            title=f"{symbol} Live Chart",
+                            xaxis_title="Date",
+                            yaxis_title="Price",
+                            height=800,
+                            template='plotly_dark' if chart_theme == 'Dark' else 'plotly_white',
+                            showlegend=True,
+                            legend=dict(
+                                yanchor="top",
+                                y=0.99,
+                                xanchor="left",
+                                x=0.01
+                            ),
+                            margin=dict(l=0, r=0, t=30, b=0)
+                        )
+                        
+                        # Add range slider
+                        fig.update_xaxes(rangeslider_visible=True)
+                        
+                        # Add drawing tools
+                        config = {
+                            'modeBarButtonsToAdd': [
+                                'drawline',
+                                'drawopenpath',
+                                'drawclosedpath',
+                                'drawcircle',
+                                'drawrect',
+                                'eraseshape'
+                            ]
+                        }
+                        
+                        # Display the chart
+                        st.plotly_chart(fig, use_container_width=True, config=config)
+                        
+                        # Quick Stats
+                        stats_cols = st.columns(4)
+                        
+                        with stats_cols[0]:
+                            current_price = data['Close'].iloc[-1]
+                            prev_close = data['Close'].iloc[-2]
+                            price_change = current_price - prev_close
+                            price_change_pct = (price_change / prev_close) * 100
+                            
+                            st.metric(
+                                "Current Price",
+                                f"${current_price:.2f}",
+                                f"{price_change_pct:+.2f}%"
+                            )
+                        
+                        with stats_cols[1]:
+                            high = data['High'].iloc[-1]
+                            low = data['Low'].iloc[-1]
+                            st.metric("Day Range", f"${low:.2f} - ${high:.2f}")
+                        
+                        with stats_cols[2]:
+                            volume = data['Volume'].iloc[-1]
+                            avg_volume = data['Volume'].mean()
+                            volume_change = ((volume - avg_volume) / avg_volume) * 100
+                            st.metric(
+                                "Volume",
+                                f"{volume:,.0f}",
+                                f"{volume_change:+.1f}% vs Avg"
+                            )
+                        
+                        with stats_cols[3]:
+                            volatility = data['Close'].pct_change().std() * np.sqrt(252) * 100
+                            st.metric("Volatility", f"{volatility:.1f}%")
+                        
+                    else:
+                        st.warning("No data available for the selected period")
+                        
+                except Exception as e:
+                    st.error(f"Error loading chart: {str(e)}")
     
     except Exception as e:
         st.error(f"Error fetching data: {str(e)}")
