@@ -11,208 +11,168 @@ import requests
 from PIL import Image
 from io import BytesIO
 
-# Page config
+# Configure Streamlit theme
 st.set_page_config(
     page_title="ItGuess - Stock Analysis",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_icon="📈",
+    layout="wide"
 )
 
-# Custom CSS for modern design
+# Custom CSS for light/dark mode compatibility
 st.markdown("""
-    <style>
-        /* Global Styles */
-        .stApp {
-            background-color: #ffffff;
-        }
-        
-        /* Title Styling */
-        .app-title {
-            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 3.5em;
-            font-weight: 800;
-            text-align: center;
-            margin-bottom: 0;
-            padding: 10px;
-            font-family: 'Segoe UI', sans-serif;
-            letter-spacing: 2px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .app-subtitle {
-            color: #666666;
-            font-size: 1.2em;
-            text-align: center;
-            margin-bottom: 2rem;
-            font-family: 'Segoe UI', sans-serif;
-            font-weight: 300;
-        }
-        
-        /* Feature Box Styling */
-        .feature-box {
-            background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
-            border-radius: 10px;
-            padding: 15px;
-            margin: 10px 0;
-            border: 1px solid rgba(0,0,0,0.1);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        
-        .feature-title {
-            color: #333;
-            font-size: 1.1em;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .feature-desc {
-            color: #666;
-            font-size: 0.9em;
-            line-height: 1.4;
-        }
-        
-        /* Header styling */
-        h1 {
-            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-            font-weight: 800;
-            font-size: 2.5rem;
-            background: linear-gradient(120deg, #FF4B4B, #7E56DA);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin: 1rem 0;
-        }
-        
-        /* Subheader styling */
-        h2, h3 {
-            color: #0F1642;
-            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-            font-weight: 600;
-        }
-        
-        /* Card styling */
-        div.stMetric {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
-        }
-        
-        /* Metrics styling */
-        div[data-testid="stMetricValue"] {
-            font-size: 2rem !important;
-            font-weight: 700 !important;
-            color: #0F1642 !important;
-        }
-        
-        div[data-testid="stMetricLabel"] {
-            font-size: 1rem !important;
-            color: #666666 !important;
-        }
-        
-        /* Sidebar styling */
-        section[data-testid="stSidebar"] {
-            background-color: #f8f9fa;
-            padding: 2rem 1rem;
-        }
-        
-        section[data-testid="stSidebar"] .stTextInput input {
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            padding: 1rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        section[data-testid="stSidebar"] .stTextInput input:focus {
-            border-color: #7E56DA;
-            box-shadow: 0 0 0 3px rgba(126, 86, 218, 0.1);
-        }
-        
-        /* Button styling */
-        .stButton button {
-            background: linear-gradient(135deg, #FF4B4B, #7E56DA);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 12px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        .stButton button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(126, 86, 218, 0.2);
-        }
-        
-        /* Tabs styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 1rem;
-            background-color: transparent;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            background-color: transparent;
-            border: none;
-            color: #666666;
-            font-weight: 600;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background: linear-gradient(135deg, #FF4B4B20, #7E56DA20);
-            color: #7E56DA;
-        }
-        
-        /* Plot styling */
-        .js-plotly-plot {
-            border-radius: 16px;
-            padding: 1rem;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
-        }
-        
-        /* Search box styling */
-        .search-container {
-            position: relative;
-            margin: 2rem 0;
-        }
-        
-        .search-container input {
-            width: 100%;
-            padding: 1rem 1.5rem;
-            font-size: 1.1rem;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        .search-container input:focus {
-            border-color: #7E56DA;
-            box-shadow: 0 0 0 3px rgba(126, 86, 218, 0.1);
-            outline: none;
-        }
-        
-        /* Custom gradients */
-        .gradient-text {
-            background: linear-gradient(120deg, #FF4B4B, #7E56DA);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .gradient-bg {
-            background: linear-gradient(135deg, #FF4B4B20, #7E56DA20);
-        }
-    </style>
+<style>
+    /* Light mode styles */
+    [data-theme="light"] {
+        --text-color: #333333;
+        --background-color: #ffffff;
+        --card-background: #f8f9fa;
+        --border-color: #e0e0e0;
+        --hover-color: #f0f0f0;
+        --link-color: #1e88e5;
+    }
+    
+    /* Dark mode styles */
+    [data-theme="dark"] {
+        --text-color: #e0e0e0;
+        --background-color: #1a1a1a;
+        --card-background: #2d2d2d;
+        --border-color: #404040;
+        --hover-color: #3d3d3d;
+        --link-color: #64b5f6;
+    }
+    
+    /* Common styles */
+    .stApp {
+        color: var(--text-color);
+        background-color: var(--background-color);
+    }
+    
+    .feature-box {
+        background-color: var(--card-background);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px;
+        transition: transform 0.2s;
+    }
+    
+    .feature-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .feature-title {
+        color: var(--text-color);
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .feature-desc {
+        color: var(--text-color);
+        font-size: 0.9em;
+    }
+    
+    .gradient-text {
+        background: linear-gradient(45deg, #1e88e5, #64b5f6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2em;
+        font-weight: bold;
+    }
+    
+    .metric-card {
+        background-color: var(--card-background);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 15px;
+        margin: 5px;
+    }
+    
+    .metric-value {
+        color: var(--text-color);
+        font-size: 1.5em;
+        font-weight: bold;
+    }
+    
+    .metric-label {
+        color: var(--text-color);
+        font-size: 0.9em;
+        opacity: 0.8;
+    }
+    
+    /* Plotly chart customization */
+    .js-plotly-plot .plotly .modebar {
+        background-color: var(--card-background) !important;
+    }
+    
+    /* Table customization */
+    .dataframe {
+        background-color: var(--card-background);
+        border: 1px solid var(--border-color);
+    }
+    
+    .dataframe th {
+        background-color: var(--hover-color);
+        color: var(--text-color);
+    }
+    
+    .dataframe td {
+        color: var(--text-color);
+    }
+    
+    /* Links */
+    a {
+        color: var(--link-color);
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+    
+    /* Streamlit components */
+    .stSelectbox, .stTextInput {
+        background-color: var(--card-background);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+    
+    .stButton button {
+        background-color: var(--link-color);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .stButton button:hover {
+        opacity: 0.9;
+    }
+</style>
 """, unsafe_allow_html=True)
+
+# Add theme selector in sidebar
+theme = st.sidebar.selectbox(
+    "Choose Theme",
+    ["Light", "Dark"],
+    key="theme_selector"
+)
+
+# Apply theme
+if theme == "Dark":
+    st.markdown("""
+        <script>
+            document.querySelector('body').setAttribute('data-theme', 'dark');
+        </script>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <script>
+            document.querySelector('body').setAttribute('data-theme', 'light');
+        </script>
+    """, unsafe_allow_html=True)
 
 # Initialize session state for symbol tracking
 if 'last_symbol' not in st.session_state:
@@ -508,8 +468,11 @@ if symbol:
                     with col1:
                         st.subheader("MACD")
                         macd_data = analysis_data['macd']
-                        st.metric("MACD", f"{macd_data['macd']:.2f}")
-                        st.metric("Signal", f"{macd_data['signal']:.2f}")
+                        st.metric(
+                            "MACD",
+                            f"{macd_data['macd']:.2f}",
+                            f"{macd_data['signal']:.2f}"
+                        )
                         st.metric("Signal", macd_data['interpretation'])
                     
                     with col2:
