@@ -321,11 +321,6 @@ with st.sidebar:
 
     # Analysis settings
     with st.expander("Analysis Settings", expanded=True):
-        st.subheader("Prediction Settings")
-        period = st.selectbox("Prediction Period", 
-                            ["1d", "3d", "1w", "2w", "1m"],
-                            help="Select the time period for price prediction")
-        
         st.subheader("Technical Analysis Settings")
         rsi_period = st.slider("RSI Period", 
                              min_value=1, max_value=21, value=14,
@@ -628,50 +623,50 @@ if symbol:
                     prediction_data = prediction_service.predict(symbol)
                     
                     if prediction_data:
-                        col1, col2 = st.columns([2, 1])
+                        # Plot predicted vs actual prices
+                        fig = go.Figure()
+                        
+                        # Add actual prices
+                        fig.add_trace(go.Scatter(
+                            x=prediction_data['dates'],
+                            y=prediction_data['actual_prices'],
+                            name='Actual Price',
+                            line=dict(color='blue')
+                        ))
+                        
+                        # Add predicted prices
+                        fig.add_trace(go.Scatter(
+                            x=prediction_data['dates'],
+                            y=prediction_data['predicted_prices'],
+                            name='Predicted Price',
+                            line=dict(color='red', dash='dash')
+                        ))
+                        
+                        # Add confidence intervals if available
+                        if 'upper_bound' in prediction_data and 'lower_bound' in prediction_data:
+                            fig.add_trace(go.Scatter(
+                                x=prediction_data['dates'] + prediction_data['dates'][::-1],
+                                y=prediction_data['upper_bound'] + prediction_data['lower_bound'][::-1],
+                                fill='toself',
+                                fillcolor='rgba(255,0,0,0.1)',
+                                line=dict(color='rgba(255,0,0,0)'),
+                                name='95% Confidence Interval'
+                            ))
+                        
+                        fig.update_layout(
+                            title=f"{symbol} Price Prediction",
+                            xaxis_title="Date",
+                            yaxis_title="Price",
+                            template='plotly_white',
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Display metrics and predictions in columns
+                        col1, col2 = st.columns([1, 1])
                         
                         with col1:
-                            # Plot predicted vs actual prices
-                            fig = go.Figure()
-                            
-                            # Add actual prices
-                            fig.add_trace(go.Scatter(
-                                x=prediction_data['dates'],
-                                y=prediction_data['actual_prices'],
-                                name='Actual Price',
-                                line=dict(color='blue')
-                            ))
-                            
-                            # Add predicted prices
-                            fig.add_trace(go.Scatter(
-                                x=prediction_data['dates'],
-                                y=prediction_data['predicted_prices'],
-                                name='Predicted Price',
-                                line=dict(color='red', dash='dash')
-                            ))
-                            
-                            # Add confidence intervals if available
-                            if 'upper_bound' in prediction_data and 'lower_bound' in prediction_data:
-                                fig.add_trace(go.Scatter(
-                                    x=prediction_data['dates'] + prediction_data['dates'][::-1],
-                                    y=prediction_data['upper_bound'] + prediction_data['lower_bound'][::-1],
-                                    fill='toself',
-                                    fillcolor='rgba(255,0,0,0.1)',
-                                    line=dict(color='rgba(255,0,0,0)'),
-                                    name='95% Confidence Interval'
-                                ))
-                            
-                            fig.update_layout(
-                                title=f"{symbol} Price Prediction",
-                                xaxis_title="Date",
-                                yaxis_title="Price",
-                                template='plotly_white',
-                                height=400
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        with col2:
                             # Display prediction metrics
                             st.markdown("### Prediction Metrics")
                             
@@ -689,23 +684,40 @@ if symbol:
                             feature_importance = prediction_data.get('feature_importance', {})
                             for feature, importance in feature_importance.items():
                                 st.metric(feature, f"{importance:.2f}%")
+                        
+                        with col2:
+                            # Future predictions
+                            st.markdown("### Future Price Predictions")
+                            future_predictions = prediction_data.get('future_predictions', {})
                             
-                            # Next day prediction
-                            st.markdown("### Next Day Prediction")
-                            next_day = prediction_data.get('next_day_prediction', {})
-                            if next_day:
-                                next_price = next_day.get('price', 0)
-                                current_price = prediction_data['actual_prices'][-1]
-                                price_change = ((next_price - current_price) / current_price) * 100
-                                
-                                price_color = "green" if price_change > 0 else "red"
-                                st.markdown(f"""
-                                <div style='text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
-                                    <h3 style='margin: 0;'>Predicted Price</h3>
-                                    <h2 style='color: {price_color}; margin: 10px 0;'>${next_price:.2f}</h2>
-                                    <p style='color: {price_color}; margin: 0;'>{price_change:+.2f}%</p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                            current_price = prediction_data['actual_prices'][-1]
+                            
+                            periods = {
+                                '3_days': 'Next 3 Days',
+                                '1_week': 'Next Week',
+                                '2_weeks': 'Next 2 Weeks',
+                                '1_month': 'Next Month',
+                                '1_year': 'Next Year',
+                                '5_years': 'Next 5 Years'
+                            }
+                            
+                            for key, label in periods.items():
+                                if key in future_predictions:
+                                    pred = future_predictions[key]
+                                    price = pred['price']
+                                    confidence = pred['confidence']
+                                    change = ((price - current_price) / current_price) * 100
+                                    
+                                    price_color = "green" if change > 0 else "red"
+                                    st.markdown(f"""
+                                    <div style='padding: 10px; background: white; border-radius: 5px; margin: 5px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'>
+                                        <div style='display: flex; justify-content: space-between; align-items: center;'>
+                                            <span style='font-weight: bold;'>{label}</span>
+                                            <span style='color: {price_color};'>${price:.2f} ({change:+.1f}%)</span>
+                                        </div>
+                                        <div style='color: #666; font-size: 0.8em;'>Confidence: {confidence*100:.1f}%</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                     else:
                         st.error("Unable to generate predictions. Please try again later.")
                         

@@ -402,6 +402,7 @@ class PredictionService:
             # Prepare prediction data
             dates = df.index.tolist()
             actual_prices = df['Close'].tolist()
+            current_price = actual_prices[-1]
             
             # Calculate predicted prices (using technical indicators)
             predicted_prices = []
@@ -417,10 +418,35 @@ class PredictionService:
                 upper_bound.append(base_pred * 1.02)
                 lower_bound.append(base_pred * 0.98)
             
-            # Calculate next day prediction
-            next_day = {
-                'price': predicted_prices[-1] * (1 + technical_prediction['signal_strength']),
-                'confidence': technical_prediction['confidence']
+            # Calculate future predictions
+            signal = technical_prediction['signal_strength']
+            confidence = technical_prediction['confidence']
+            
+            future_predictions = {
+                '3_days': {
+                    'price': current_price * (1 + signal * 3),
+                    'confidence': confidence * 0.95
+                },
+                '1_week': {
+                    'price': current_price * (1 + signal * 7),
+                    'confidence': confidence * 0.9
+                },
+                '2_weeks': {
+                    'price': current_price * (1 + signal * 14),
+                    'confidence': confidence * 0.85
+                },
+                '1_month': {
+                    'price': current_price * (1 + signal * 30),
+                    'confidence': confidence * 0.8
+                },
+                '1_year': {
+                    'price': current_price * (1 + signal * 365),
+                    'confidence': confidence * 0.6
+                },
+                '5_years': {
+                    'price': current_price * (1 + signal * 1825),
+                    'confidence': confidence * 0.4
+                }
             }
             
             # Get feature importance
@@ -444,7 +470,7 @@ class PredictionService:
                 'predicted_prices': predicted_prices,
                 'upper_bound': upper_bound,
                 'lower_bound': lower_bound,
-                'next_day_prediction': next_day,
+                'future_predictions': future_predictions,
                 'feature_importance': feature_importance,
                 'metrics': metrics,
                 'technical': technical_prediction
