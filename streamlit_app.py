@@ -210,27 +210,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Add theme selector in sidebar
-theme = st.sidebar.selectbox(
-    "Choose Theme",
-    ["Light", "Dark"],
-    key="theme_selector"
-)
-
-# Apply theme
-if theme == "Dark":
-    st.markdown("""
-        <script>
-            document.querySelector('body').setAttribute('data-theme', 'dark');
-        </script>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-        <script>
-            document.querySelector('body').setAttribute('data-theme', 'light');
-        </script>
-    """, unsafe_allow_html=True)
-
 # Initialize session state for symbol tracking
 if 'last_symbol' not in st.session_state:
     st.session_state.last_symbol = ''
@@ -343,13 +322,19 @@ with st.sidebar:
     st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
     
     # Theme selector
-    theme = st.selectbox('Choose Theme', ['Light', 'Dark'], key='theme_selector')
-    if theme:
-        st.markdown(f"""
-            <script>
-                document.querySelector('body').setAttribute('data-theme', '{theme.lower()}');
-            </script>
-        """, unsafe_allow_html=True)
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'Light'
+    
+    theme = st.selectbox(
+        'Choose Theme',
+        ['Light', 'Dark'],
+        key='theme_select',
+        index=['Light', 'Dark'].index(st.session_state.theme)
+    )
+    
+    if theme != st.session_state.theme:
+        st.session_state.theme = theme
+        set_theme(theme.lower())
     
     # Search box with improved styling
     st.markdown("<div class='search-container'>", unsafe_allow_html=True)
