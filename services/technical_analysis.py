@@ -105,46 +105,67 @@ class TechnicalAnalysisService:
             low_min = self.data['Low'].rolling(window=period).min()
             high_max = self.data['High'].rolling(window=period).max()
             
-            k = 100 * ((self.data['Close'] - low_min) / (high_max - low_min))
+            # Handle division by zero
+            denominator = high_max - low_min
+            k = pd.Series(0, index=self.data.index)  # Initialize with zeros
+            valid_denom = denominator != 0
+            k[valid_denom] = 100 * ((self.data['Close'][valid_denom] - low_min[valid_denom]) / denominator[valid_denom])
+            
             d = k.rolling(window=3).mean()
             
-            current_k = k.iloc[-1]
-            current_d = d.iloc[-1]
+            # Check if we have valid data
+            if len(k) > 0 and not pd.isna(k.iloc[-1]) and not pd.isna(d.iloc[-1]):
+                current_k = k.iloc[-1]
+                current_d = d.iloc[-1]
+                
+                # Generate signal
+                if current_k > 80 and current_d > 80:
+                    signal = "Sell"
+                elif current_k < 20 and current_d < 20:
+                    signal = "Buy"
+                else:
+                    signal = "Neutral"
+                
+                return {
+                    'K': current_k,
+                    'D': current_d,
+                    'signal': signal
+                }
             
-            # Generate signal
-            if current_k > 80 and current_d > 80:
-                signal = "Sell"
-            elif current_k < 20 and current_d < 20:
-                signal = "Buy"
-            else:
-                signal = "Neutral"
+            return {'K': None, 'D': None, 'signal': 'Neutral'}
             
-            return {
-                'K': current_k,
-                'D': current_d,
-                'signal': signal
-            }
-        except:
+        except Exception as e:
+            print(f"Error in stochastic calculation: {str(e)}")
             return {'K': None, 'D': None, 'signal': 'Neutral'}
     
     def _calculate_obv(self):
         """Calculate On-Balance Volume"""
         try:
-            obv = (np.sign(self.data['Close'].diff()) * self.data['Volume']).fillna(0).cumsum()
+            # Handle NaN values in Close price differences
+            price_diff = self.data['Close'].diff()
+            price_diff = price_diff.fillna(0)
+            
+            # Calculate OBV
+            obv = (np.sign(price_diff) * self.data['Volume']).fillna(0).cumsum()
             
             # Calculate OBV trend
             obv_sma = obv.rolling(window=20).mean()
-            trend = "up" if obv.iloc[-1] > obv_sma.iloc[-1] else "down"
             
-            # Generate signal
-            signal = "Buy" if trend == "up" else "Sell"
+            # Check if we have valid data
+            if len(obv) > 0 and not pd.isna(obv.iloc[-1]) and not pd.isna(obv_sma.iloc[-1]):
+                trend = "up" if obv.iloc[-1] > obv_sma.iloc[-1] else "down"
+                signal = "Buy" if trend == "up" else "Sell"
+                
+                return {
+                    'OBV': obv.iloc[-1],
+                    'trend': trend,
+                    'signal': signal
+                }
             
-            return {
-                'OBV': obv.iloc[-1],
-                'trend': trend,
-                'signal': signal
-            }
-        except:
+            return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
+            
+        except Exception as e:
+            print(f"Error in OBV calculation: {str(e)}")
             return {'OBV': None, 'trend': 'neutral', 'signal': 'Neutral'}
     
     def _calculate_volume_analysis(self):
@@ -153,27 +174,35 @@ class TechnicalAnalysisService:
             volume = self.data['Volume']
             volume_ma = volume.rolling(window=20).mean()
             
-            current_volume = volume.iloc[-1]
-            current_ma = volume_ma.iloc[-1]
+            # Check if we have valid data
+            if len(volume) > 0 and not pd.isna(volume.iloc[-1]) and not pd.isna(volume_ma.iloc[-1]):
+                current_volume = volume.iloc[-1]
+                current_ma = volume_ma.iloc[-1]
+                
+                # Determine volume trend
+                trend = "up" if current_volume > current_ma else "down"
+                
+                # Make sure we have valid price data
+                if not pd.isna(self.data['Close'].iloc[-1]) and not pd.isna(self.data['Open'].iloc[-1]):
+                    # Generate signal
+                    if trend == "up" and self.data['Close'].iloc[-1] > self.data['Open'].iloc[-1]:
+                        signal = "Buy"
+                    elif trend == "down" and self.data['Close'].iloc[-1] < self.data['Open'].iloc[-1]:
+                        signal = "Sell"
+                    else:
+                        signal = "Neutral"
+                    
+                    return {
+                        'Volume': current_volume,
+                        'MA20': current_ma,
+                        'trend': trend,
+                        'signal': signal
+                    }
             
-            # Determine volume trend
-            trend = "up" if current_volume > current_ma else "down"
+            return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
             
-            # Generate signal
-            if trend == "up" and self.data['Close'].iloc[-1] > self.data['Open'].iloc[-1]:
-                signal = "Buy"
-            elif trend == "down" and self.data['Close'].iloc[-1] < self.data['Open'].iloc[-1]:
-                signal = "Sell"
-            else:
-                signal = "Neutral"
-            
-            return {
-                'Volume': current_volume,
-                'MA20': current_ma,
-                'trend': trend,
-                'signal': signal
-            }
-        except:
+        except Exception as e:
+            print(f"Error in volume analysis: {str(e)}")
             return {'Volume': None, 'MA20': None, 'trend': 'neutral', 'signal': 'Neutral'}
 
 class PredictionService:

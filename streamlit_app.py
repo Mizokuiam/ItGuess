@@ -15,100 +15,148 @@ from io import BytesIO
 # Page config
 st.set_page_config(
     page_title="ItGuess - Stock Analysis",
-    page_icon="📊",
+    page_icon="💾",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for clean, modern design
+# Custom CSS for retro Mac design
 st.markdown("""
     <style>
-        /* Reset and base styles */
+        /* Global Styles */
         .stApp {
-            background-color: #ffffff;
+            background-color: #e5e5e5;
+            font-family: "Chicago", "Helvetica Neue", sans-serif;
         }
         
         /* Header styling */
         h1 {
-            color: #1a237e;
-            font-family: 'Helvetica Neue', sans-serif;
-            font-weight: 600;
-            font-size: 3rem;
+            font-family: "Chicago", "Helvetica Neue", sans-serif;
+            font-weight: 700;
+            font-size: 2.5rem;
+            color: #000000;
             text-align: center;
             margin: 2rem 0;
-            padding-bottom: 1rem;
-            border-bottom: 3px solid #1a237e;
+            padding: 1rem;
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            border-radius: 8px;
+        }
+        
+        /* Retro button styling */
+        .stButton button {
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            border-radius: 8px;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            box-shadow: 2px 2px 0px #000000;
+            transition: all 0.1s ease;
+        }
+        
+        .stButton button:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px #000000;
+        }
+        
+        /* Card styling */
+        div.stMetric {
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 4px 4px 0px #000000;
         }
         
         /* Metrics styling */
         div[data-testid="stMetricValue"] {
             font-size: 1.8rem !important;
-            color: #1a237e !important;
-        }
-        
-        div[data-testid="stMetricLabel"] {
-            font-size: 1rem !important;
-        }
-        
-        /* Card styling */
-        div.stMetric {
-            background-color: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            color: #000000 !important;
+            font-weight: bold !important;
         }
         
         /* Sidebar styling */
         section[data-testid="stSidebar"] {
-            background-color: #f8f9fa;
+            background-color: #ffffff;
+            border-right: 2px solid #000000;
+        }
+        
+        section[data-testid="stSidebar"] > div {
             padding: 2rem 1rem;
         }
         
-        /* Button styling */
-        .stButton button {
-            background-color: #1a237e;
-            color: white;
-            border: none;
-            padding: 0.5rem 1.5rem;
-            border-radius: 4px;
-            font-weight: 500;
+        /* Quick links styling */
+        .quick-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
         }
         
-        .stButton button:hover {
-            background-color: #283593;
-            border: none;
+        .quick-link {
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: #000000;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 2px 2px 0px #000000;
+        }
+        
+        .quick-link:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px #000000;
         }
         
         /* Input fields */
         .stTextInput input {
-            border-radius: 4px;
-            border: 1px solid #e0e0e0;
+            border: 2px solid #000000;
+            border-radius: 8px;
+            background-color: #ffffff;
+            padding: 0.5rem;
         }
         
         /* Tabs styling */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            padding: 0.5rem;
+            gap: 0.5rem;
+            background-color: #ffffff;
+            padding: 1rem;
+            border: 2px solid #000000;
+            border-radius: 8px;
         }
         
         .stTabs [data-baseweb="tab"] {
-            height: 3rem;
-            white-space: pre-wrap;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-            color: #1a237e;
-            font-weight: 500;
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            border-radius: 8px;
+            color: #000000;
+            font-weight: bold;
+            box-shadow: 2px 2px 0px #000000;
         }
         
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background-color: #1a237e;
-            color: white;
+            background-color: #000000;
+            color: #ffffff;
+            box-shadow: none;
+            transform: translate(2px, 2px);
         }
         
         /* Plot styling */
         .js-plotly-plot {
+            background-color: #ffffff;
+            border: 2px solid #000000;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 1rem;
+            box-shadow: 4px 4px 0px #000000;
+        }
+        
+        /* Retro icon */
+        .retro-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 1rem;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -156,7 +204,17 @@ technical_analysis, prediction_service, news_service = get_services()
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<h1 style='text-align: center; color: #1a237e; font-family: \"Helvetica Neue\", sans-serif; font-weight: 700; font-size: 2.5rem; margin-bottom: 2rem;'>ItGuess</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='retro-icon'>💾</div>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-bottom: 2rem;'>ItGuess</h1>", unsafe_allow_html=True)
+    
+    # Quick links
+    st.markdown("""
+        <div class="quick-links">
+            <a href="#" class="quick-link">Overview</a>
+            <a href="#" class="quick-link">Analysis</a>
+            <a href="#" class="quick-link">Charts</a>
+        </div>
+    """, unsafe_allow_html=True)
     
     # Stock input with popular stocks
     with st.expander("Stock Selection", expanded=True):
