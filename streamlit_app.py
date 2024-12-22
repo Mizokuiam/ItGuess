@@ -376,7 +376,7 @@ with st.sidebar:
             st.rerun()
 
 # Main content
-if not symbol:  # Show welcome page when no symbol is entered
+if symbol == "":  # Show welcome page when no symbol is entered
     # Hide default elements
     st.markdown("""
         <style>
@@ -433,7 +433,6 @@ if not symbol:  # Show welcome page when no symbol is entered
             </div>
         </div>
     """, unsafe_allow_html=True)
-    
 elif symbol:  # Show stock analysis when symbol is entered
     try:
         # Validate symbol and get info
