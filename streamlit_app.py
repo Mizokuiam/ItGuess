@@ -467,37 +467,61 @@ if symbol:
                 
                 with col2:
                     st.subheader("Peer Comparison")
-                    peer_data = news_service.get_peer_comparison(symbol)
-                    if peer_data is not None:
-                        # Create radar chart for peer comparison
-                        metrics = ['pe_ratio', 'price_to_sales', 'price_to_book', 'debt_to_equity']
-                        fig = go.Figure()
-                        
-                        for idx, row in peer_data.iterrows():
-                            fig.add_trace(go.Scatterpolar(
-                                r=[row[m] for m in metrics],
-                                theta=metrics,
-                                fill='toself',
-                                name=row['symbol']
-                            ))
+                    try:
+                        # Get peer symbols from yfinance
+                        info = stock.info
+                        peers = info.get('recommendationKey', [])
+                        if peers:
+                            peer_data = pd.DataFrame()
+                            for peer in peers[:5]:  # Limit to 5 peers
+                                try:
+                                    peer_stock = yf.Ticker(peer)
+                                    peer_info = peer_stock.info
+                                    peer_data = peer_data.append({
+                                        'symbol': peer,
+                                        'pe_ratio': peer_info.get('trailingPE', 0),
+                                        'price_to_sales': peer_info.get('priceToSalesTrailing12Months', 0),
+                                        'price_to_book': peer_info.get('priceToBook', 0),
+                                        'debt_to_equity': peer_info.get('debtToEquity', 0)
+                                    }, ignore_index=True)
+                                except:
+                                    continue
                             
-                        fig.update_layout(
-                            polar=dict(
-                                radialaxis=dict(
-                                    visible=True,
-                                    range=[0, peer_data[metrics].max().max()]
-                                )),
-                            showlegend=True,
-                            height=400
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
+                            if not peer_data.empty:
+                                # Create radar chart for peer comparison
+                                metrics = ['pe_ratio', 'price_to_sales', 'price_to_book', 'debt_to_equity']
+                                fig = go.Figure()
+                                
+                                for idx, row in peer_data.iterrows():
+                                    fig.add_trace(go.Scatterpolar(
+                                        r=[row[m] for m in metrics],
+                                        theta=metrics,
+                                        fill='toself',
+                                        name=row['symbol']
+                                    ))
+                                    
+                                fig.update_layout(
+                                    polar=dict(
+                                        radialaxis=dict(
+                                            visible=True,
+                                            range=[0, peer_data[metrics].max().max()]
+                                        )),
+                                    showlegend=True,
+                                    height=400
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.info("Peer comparison data not available")
+                        else:
+                            st.info("No peer data available")
+                    except Exception as e:
                         st.info("Peer comparison data not available")
 
                 # Third row: News Sentiment
                 st.subheader("News Sentiment Analysis")
-                news_df = news_service.get_company_news(symbol, company_info['name'] if company_info else symbol)
+                company_name = stock.info.get('longName', symbol)
+                news_df = news_service.get_company_news(symbol, company_name)
                 
                 if news_df is not None and not news_df.empty:
                     # Sentiment distribution
@@ -596,21 +620,28 @@ if symbol:
             st.subheader("News Sentiment Analysis")
             
             with st.spinner("Fetching latest news..."):
-                # Fetch news data
-                news_data = news_service.get_news(symbol)
+                # Get company info for better news search
+                info = stock.info
+                company_name = info.get('longName', symbol)
                 
-                if not news_data.empty:
+                # Fetch news data
+                news_data = news_service.get_company_news(symbol, company_name)
+                
+                if news_data is not None and not news_data.empty:
                     # Display news with sentiment
                     for _, row in news_data.iterrows():
                         with st.container():
+                            sentiment_color = "#28a745" if row['sentiment'] > 0.2 else "#dc3545" if row['sentiment'] < -0.2 else "#6c757d"
+                            sentiment_label = "Positive" if row['sentiment'] > 0.2 else "Negative" if row['sentiment'] < -0.2 else "Neutral"
+                            
                             st.markdown(f"""
                             <div style='padding: 15px; margin: 10px 0; background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
-                                <div style='border-left: 4px solid {row['sentiment_color']}; padding-left: 10px;'>
+                                <div style='border-left: 4px solid {sentiment_color}; padding-left: 10px;'>
                                     <h4 style='margin: 0; color: #333;'>{row['title']}</h4>
                                     <p style='margin: 10px 0; color: #666;'>{row['summary']}</p>
                                     <div style='display: flex; justify-content: space-between; color: #888; font-size: 0.9em;'>
                                         <span>{row['date']}</span>
-                                        <span style='color: {row['sentiment_color']};'>●&nbsp;{row['sentiment']}</span>
+                                        <span style='color: {sentiment_color};'>●&nbsp;{sentiment_label}</span>
                                     </div>
                                 </div>
                             </div>
