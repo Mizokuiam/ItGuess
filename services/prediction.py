@@ -379,6 +379,26 @@ class PredictionService:
         
         self.feature_importance[symbol] = dict(zip(features, importance))
     
+    def predict(self, symbol):
+        """Generate predictions for a given stock symbol"""
+        try:
+            print(f"\nGenerating predictions for {symbol}")
+            technical_prediction = self.predict_technical(symbol)
+            
+            if technical_prediction is None:
+                print("Technical prediction failed")
+                return None
+                
+            return {
+                'technical': technical_prediction
+            }
+            
+        except Exception as e:
+            print(f"Error in predict(): {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def predict_technical(self, symbol, period='1d'):
         """Make predictions based on technical analysis"""
         try:
@@ -411,137 +431,94 @@ class PredictionService:
             
             # Calculate technical indicators with error checking
             try:
-                # 1. RSI
-                rsi = self._calculate_rsi(df['Close'])
-                current_rsi = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
+                # RSI
+                delta = df['Close'].diff()
+                gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+                loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                current_rsi = float(rsi.iloc[-1])
                 print(f"RSI: {current_rsi:.2f}")
                 
-                # 2. MACD
-                macd_hist = self._calculate_macd(df['Close'])
-                current_macd = float(macd_hist.iloc[-1]) if not pd.isna(macd_hist.iloc[-1]) else 0
-                print(f"MACD: {current_macd:.2f}")
+                # MACD
+                exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                macd = exp1 - exp2
+                signal = macd.ewm(span=9, adjust=False).mean()
+                current_macd = float(macd.iloc[-1])
+                current_signal = float(signal.iloc[-1])
+                print(f"MACD: {current_macd:.2f}, Signal: {current_signal:.2f}")
                 
-                # 3. Moving Averages
-                ma5 = df['Close'].rolling(window=5, min_periods=1).mean()
-                ma20 = df['Close'].rolling(window=20, min_periods=1).mean()
+                # Moving Averages
+                ma5 = df['Close'].rolling(window=5).mean()
+                ma20 = df['Close'].rolling(window=20).mean()
                 current_ma5 = float(ma5.iloc[-1])
                 current_ma20 = float(ma20.iloc[-1])
                 print(f"MA5: {current_ma5:.2f}, MA20: {current_ma20:.2f}")
                 
-                # 4. Price Momentum
-                momentum = self._calculate_momentum(df['Close'])
-                current_momentum = float(momentum.iloc[-1]) if not pd.isna(momentum.iloc[-1]) else 0
+                # Price Momentum
+                momentum = df['Close'].diff(5)
+                current_momentum = float(momentum.iloc[-1])
                 print(f"Momentum: {current_momentum:.2f}")
                 
-                # 5. Bollinger Bands
-                bb_width = self._calculate_bollinger_bands(df['Close'])
-                current_bb = float(bb_width.iloc[-1]) if not pd.isna(bb_width.iloc[-1]) else 1
-                print(f"BB Width: {current_bb:.2f}")
-                
-                # 6. Volume Analysis
-                volume_ma5 = df['Volume'].rolling(window=5, min_periods=1).mean()
+                # Volume Analysis
+                volume_ma = df['Volume'].rolling(window=20).mean()
                 current_volume = float(df['Volume'].iloc[-1])
-                volume_trend = (current_volume / float(volume_ma5.iloc[-1]) - 1) if not pd.isna(volume_ma5.iloc[-1]) and volume_ma5.iloc[-1] != 0 else 0
-                print(f"Volume trend: {volume_trend:.2%}")
+                volume_ratio = current_volume / float(volume_ma.iloc[-1])
+                print(f"Volume ratio: {volume_ratio:.2f}")
                 
-                # Initialize signals with default weights
-                signals = []
-                signal_strengths = []
+                # Bollinger Bands
+                ma20 = df['Close'].rolling(window=20).mean()
+                std20 = df['Close'].rolling(window=20).std()
+                upper_band = ma20 + (std20 * 2)
+                lower_band = ma20 - (std20 * 2)
+                current_upper = float(upper_band.iloc[-1])
+                current_lower = float(lower_band.iloc[-1])
+                print(f"Bollinger Bands - Upper: {current_upper:.2f}, Lower: {current_lower:.2f}")
                 
-                print("\nAnalyzing signals...")
+                # Generate prediction based on technical indicators
+                prediction = current_price  # Start with current price
                 
                 # RSI signals
-                if current_rsi < 30:
-                    signals.append(1)  # Oversold - bullish
-                    signal_strengths.append(1.5)
-                    print("RSI indicates oversold (bullish)")
-                elif current_rsi > 70:
-                    signals.append(-1)  # Overbought - bearish
-                    signal_strengths.append(1.5)
-                    print("RSI indicates overbought (bearish)")
-                else:
-                    signals.append(0)
-                    signal_strengths.append(1.0)
-                    print("RSI is neutral")
+                if current_rsi > 70:  # Overbought
+                    prediction *= 0.99
+                elif current_rsi < 30:  # Oversold
+                    prediction *= 1.01
                 
                 # MACD signals
-                if current_macd > 0:
-                    signals.append(1)  # Bullish
-                    signal_strengths.append(1.2)
-                    print("MACD is positive (bullish)")
-                else:
-                    signals.append(-1)  # Bearish
-                    signal_strengths.append(1.2)
-                    print("MACD is negative (bearish)")
+                if current_macd > current_signal:  # Bullish
+                    prediction *= 1.01
+                else:  # Bearish
+                    prediction *= 0.99
                 
                 # Moving Average signals
-                if current_ma5 > current_ma20:
-                    signals.append(1)  # Golden cross - bullish
-                    signal_strengths.append(1.3)
-                    print("Moving averages show uptrend (bullish)")
-                else:
-                    signals.append(-1)  # Death cross - bearish
-                    signal_strengths.append(1.3)
-                    print("Moving averages show downtrend (bearish)")
+                if current_ma5 > current_ma20:  # Bullish
+                    prediction *= 1.01
+                else:  # Bearish
+                    prediction *= 0.99
                 
                 # Momentum signals
-                if current_momentum > 0:
-                    signals.append(1)
-                    signal_strengths.append(1.1)
-                    print("Momentum is positive (bullish)")
-                else:
-                    signals.append(-1)
-                    signal_strengths.append(1.1)
-                    print("Momentum is negative (bearish)")
+                if current_momentum > 0:  # Positive momentum
+                    prediction *= 1.01
+                else:  # Negative momentum
+                    prediction *= 0.99
                 
-                # Volume trend signals
-                if volume_trend > 0.1:  # Volume increasing
-                    signals.append(1)
-                    signal_strengths.append(1.2)
-                    print("Volume is increasing (bullish)")
-                elif volume_trend < -0.1:  # Volume decreasing
-                    signals.append(-1)
-                    signal_strengths.append(1.2)
-                    print("Volume is decreasing (bearish)")
-                else:
-                    signals.append(0)
-                    signal_strengths.append(1.0)
-                    print("Volume is stable (neutral)")
+                # Volume signals
+                if volume_ratio > 1.5:  # High volume
+                    if current_price > current_ma5:  # High volume + price above MA5
+                        prediction *= 1.01
+                    else:
+                        prediction *= 0.99
                 
-                print(f"\nSignals: {signals}")
-                print(f"Signal strengths: {signal_strengths}")
+                # Bollinger Band signals
+                bb_position = (current_price - lower_band.iloc[-1]) / (upper_band.iloc[-1] - lower_band.iloc[-1])
+                if bb_position > 0.8:  # Near upper band
+                    prediction *= 0.99
+                elif bb_position < 0.2:  # Near lower band
+                    prediction *= 1.01
                 
-                # Calculate weighted signal
-                weighted_signal = sum(s * w for s, w in zip(signals, signal_strengths)) / sum(signal_strengths)
-                print(f"Weighted signal: {weighted_signal:.2f}")
-                
-                # Convert signal to price prediction
-                # Scale the signal to a reasonable percentage change (-2% to +2%)
-                predicted_change = weighted_signal * 0.02
-                
-                # Calculate predicted price
-                predicted_price = current_price * (1 + predicted_change)
-                
-                # Calculate confidence intervals
-                confidence_range = abs(predicted_change) * 0.5
-                lower_bound = current_price * (1 + predicted_change - confidence_range)
-                upper_bound = current_price * (1 + predicted_change + confidence_range)
-                
-                print(f"\nPrediction Summary:")
-                print(f"Current Price: ${current_price:.2f}")
-                print(f"Predicted Price: ${predicted_price:.2f}")
-                print(f"Predicted Change: {predicted_change:.2%}")
-                print(f"Confidence Interval: ${lower_bound:.2f} to ${upper_bound:.2f}")
-                
-                predictions = {
-                    'technical': float(predicted_price)
-                }
-                
-                self.confidence_intervals[symbol] = {
-                    'technical': (float(lower_bound), float(upper_bound))
-                }
-                
-                return predictions
+                print(f"Final prediction: ${prediction:.2f}")
+                return prediction
                 
             except Exception as e:
                 print(f"Error calculating technical indicators: {str(e)}")
@@ -550,22 +527,43 @@ class PredictionService:
                 return None
             
         except Exception as e:
-            print(f"Error in technical analysis: {str(e)}")
+            print(f"Error in predict_technical(): {str(e)}")
             import traceback
             traceback.print_exc()
             return None
-    
-    def predict(self, symbol, period='1d'):
-        """Make predictions using technical analysis"""
-        return self.predict_technical(symbol, period)
-    
+
+    def get_confidence_intervals(self, symbol):
+        """Calculate confidence intervals for predictions"""
+        try:
+            print(f"\nCalculating confidence intervals for {symbol}")
+            
+            # Get predictions
+            predictions = self.predict(symbol)
+            if predictions is None:
+                print("No predictions available for confidence intervals")
+                return None
+            
+            technical_pred = predictions['technical']
+            
+            # Calculate intervals (using a simple percentage-based approach)
+            lower_bound = technical_pred * 0.98  # 2% below prediction
+            upper_bound = technical_pred * 1.02  # 2% above prediction
+            
+            return {
+                symbol: {
+                    'technical': (lower_bound, upper_bound)
+                }
+            }
+            
+        except Exception as e:
+            print(f"Error calculating confidence intervals: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def get_prediction_history(self, symbol):
         """Get prediction history"""
         return self.history.get(symbol, None)
-    
-    def get_confidence_intervals(self, symbol):
-        """Get confidence intervals for predictions"""
-        return self.confidence_intervals.get(symbol, None)
     
     def get_feature_importance(self, symbol):
         """Get feature importance scores"""
