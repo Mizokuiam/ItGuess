@@ -53,6 +53,7 @@ st.markdown("""
         text-align: center;
         transition: transform 0.3s ease;
         border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 0.5rem;
     }
     
     .feature-card:hover {
@@ -69,6 +70,7 @@ st.markdown("""
         color: #ff4b4b;
         font-size: 1.25rem;
         margin-bottom: 0.5rem;
+        font-weight: bold;
     }
     
     .feature-description {
@@ -95,6 +97,14 @@ st.markdown("""
         .feature-description {
             color: rgba(0, 0, 0, 0.8);
         }
+    }
+    
+    /* Emoji styling */
+    .stMarkdown div[data-testid="stMarkdownContainer"] p {
+        font-size: 2.5rem;
+        text-align: center;
+        margin-top: -1rem;
+        margin-bottom: 1rem;
     }
     
     /* Hide Streamlit branding */
@@ -247,46 +257,46 @@ if not symbol:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("""
+        st.write("""
             <div class="feature-card">
-                <div class="feature-icon">💹</div>
-                <h3 class="feature-title">Stock Information</h3>
-                <p class="feature-description">
+                <div class="feature-title">Stock Information</div>
+                <div class="feature-description">
                     Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
-                </p>
+                </div>
             </div>
         """, unsafe_allow_html=True)
+        st.write("💹")
         
-        st.markdown("""
+        st.write("""
             <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <h3 class="feature-title">Technical Analysis</h3>
-                <p class="feature-description">
+                <div class="feature-title">Technical Analysis</div>
+                <div class="feature-description">
                     Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
-                </p>
+                </div>
             </div>
         """, unsafe_allow_html=True)
+        st.write("📊")
     
     with col2:
-        st.markdown("""
+        st.write("""
             <div class="feature-card">
-                <div class="feature-icon">🎯</div>
-                <h3 class="feature-title">Price Prediction</h3>
-                <p class="feature-description">
+                <div class="feature-title">Price Prediction</div>
+                <div class="feature-description">
                     AI-powered forecasting using machine learning to predict future stock price movements and trends.
-                </p>
+                </div>
             </div>
         """, unsafe_allow_html=True)
+        st.write("🎯")
         
-        st.markdown("""
+        st.write("""
             <div class="feature-card">
-                <div class="feature-icon">📈</div>
-                <h3 class="feature-title">Live Charts</h3>
-                <p class="feature-description">
+                <div class="feature-title">Live Charts</div>
+                <div class="feature-description">
                     Interactive real-time charts with customizable timeframes and technical overlay indicators.
-                </p>
+                </div>
             </div>
         """, unsafe_allow_html=True)
+        st.write("📈")
 
 elif symbol:  # Show stock analysis when symbol is entered
     try:
