@@ -249,7 +249,9 @@ if not symbol:
     with col1:
         st.markdown("""
             <div class="feature-card">
-                <div class="feature-icon">:chart_with_upwards_trend:</div>
+                <div class="feature-icon">""", unsafe_allow_html=True)
+        st.markdown(":chart_with_upwards_trend:", unsafe_allow_html=True)
+        st.markdown("""</div>
                 <h3 class="feature-title">Stock Information</h3>
                 <p class="feature-description">
                     Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
@@ -259,7 +261,9 @@ if not symbol:
         
         st.markdown("""
             <div class="feature-card">
-                <div class="feature-icon">:bar_chart:</div>
+                <div class="feature-icon">""", unsafe_allow_html=True)
+        st.markdown(":bar_chart:", unsafe_allow_html=True)
+        st.markdown("""</div>
                 <h3 class="feature-title">Technical Analysis</h3>
                 <p class="feature-description">
                     Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
@@ -270,7 +274,9 @@ if not symbol:
     with col2:
         st.markdown("""
             <div class="feature-card">
-                <div class="feature-icon">:crystal_ball:</div>
+                <div class="feature-icon">""", unsafe_allow_html=True)
+        st.markdown(":crystal_ball:", unsafe_allow_html=True)
+        st.markdown("""</div>
                 <h3 class="feature-title">Price Prediction</h3>
                 <p class="feature-description">
                     AI-powered forecasting using machine learning to predict future stock price movements and trends.
@@ -280,7 +286,9 @@ if not symbol:
         
         st.markdown("""
             <div class="feature-card">
-                <div class="feature-icon">:chart:</div>
+                <div class="feature-icon">""", unsafe_allow_html=True)
+        st.markdown(":chart:", unsafe_allow_html=True)
+        st.markdown("""</div>
                 <h3 class="feature-title">Live Charts</h3>
                 <p class="feature-description">
                     Interactive real-time charts with customizable timeframes and technical overlay indicators.
