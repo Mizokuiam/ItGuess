@@ -117,6 +117,110 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Helper functions
+@st.cache_data(ttl=3600)
+def load_company_logo(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        if 'logo_url' in stock.info:
+            response = requests.get(stock.info['logo_url'])
+            img = Image.open(BytesIO(response.content))
+            return img
+        return None
+    except:
+        return None
+
+@st.cache_data(ttl=3600)
+def get_company_info(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        # Get additional key statistics
+        try:
+            market_stats = {
+                'Market Cap': info.get('marketCap', 'N/A'),
+                'Volume': info.get('volume', 'N/A'),
+                'P/E Ratio': info.get('trailingPE', 'N/A'),
+                '52 Week High': info.get('fiftyTwoWeekHigh', 'N/A'),
+                '52 Week Low': info.get('fiftyTwoWeekLow', 'N/A'),
+                'Beta': info.get('beta', 'N/A'),
+                'Dividend Yield': info.get('dividendYield', 'N/A'),
+                'Profit Margin': info.get('profitMargins', 'N/A'),
+            }
+            
+            # Format the values
+            for key, value in market_stats.items():
+                if value != 'N/A':
+                    if key == 'Market Cap':
+                        value = f"${value:,.0f}" if value >= 1e9 else f"${value/1e6:.2f}M"
+                    elif key == 'Volume':
+                        value = f"{value:,.0f}"
+                    elif key in ['P/E Ratio', 'Beta']:
+                        value = f"{value:.2f}"
+                    elif key in ['52 Week High', '52 Week Low']:
+                        value = f"${value:.2f}"
+                    elif key in ['Dividend Yield', 'Profit Margin']:
+                        value = f"{value*100:.2f}%" if value is not None else 'N/A'
+                market_stats[key] = value
+                
+            info.update(market_stats)
+        except Exception as e:
+            st.warning(f"Some market statistics may be unavailable: {str(e)}")
+            
+        return info
+    except Exception as e:
+        st.error(f"Error fetching company information: {str(e)}")
+        return None
+
+def display_company_logo(symbol):
+    """Display company logo if available"""
+    try:
+        # Try to get logo from different sources
+        logo_url = None
+        
+        # Try Wikipedia logo first
+        try:
+            response = requests.get(f"https://logo.clearbit.com/{symbol.lower()}.com")
+            if response.status_code == 200:
+                logo_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
+        except:
+            pass
+        
+        # Try Clearbit as backup
+        if not logo_url:
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                website = info.get('website', '')
+                if website:
+                    domain = website.replace('http://', '').replace('https://', '').split('/')[0]
+                    logo_url = f"https://logo.clearbit.com/{domain}"
+            except:
+                pass
+        
+        # Display logo if found
+        if logo_url:
+            try:
+                response = requests.get(logo_url)
+                if response.status_code == 200:
+                    image = Image.open(BytesIO(response.content))
+                    st.image(image, width=100)
+                    return True
+            except:
+                pass
+        
+        return False
+    except Exception as e:
+        print(f"Error displaying logo: {str(e)}")
+        return False
+
+def get_services():
+    """Initialize all services"""
+    technical_analysis = TechnicalAnalysisService()
+    prediction_service = PredictionService()
+    return technical_analysis, prediction_service
+
 # Initialize session state for symbol tracking
 if 'last_symbol' not in st.session_state:
     st.session_state.last_symbol = None
@@ -277,7 +381,7 @@ elif symbol:  # Show stock analysis when symbol is entered
         with tabs[1]:  # Technical Analysis Tab
             with st.spinner("Calculating technical indicators..."):
                 # Get technical analysis data
-                analysis_data = technical_analysis.analyze(symbol)
+                analysis_data = st.session_state.services[0].analyze(symbol)
                 
                 if analysis_data is None:
                     st.error("Unable to perform technical analysis")
@@ -337,10 +441,10 @@ elif symbol:  # Show stock analysis when symbol is entered
             with st.spinner("Calculating price predictions..."):
                 try:
                     # Train models first
-                    prediction_service.train_models(symbol)
+                    st.session_state.services[1].train_models(symbol)
                     
                     # Get prediction data
-                    prediction_data = prediction_service.predict(symbol)
+                    prediction_data = st.session_state.services[1].predict(symbol)
                     
                     if prediction_data:
                         # Plot predicted vs actual prices
@@ -706,112 +810,6 @@ elif symbol:  # Show stock analysis when symbol is entered
         st.error(f"Error fetching data: {str(e)}")
 else:
     st.info("Please enter a valid stock symbol. Example: AAPL for Apple Inc.")
-
-# Helper functions
-@st.cache_data(ttl=3600)
-def load_company_logo(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        if 'logo_url' in stock.info:
-            response = requests.get(stock.info['logo_url'])
-            img = Image.open(BytesIO(response.content))
-            return img
-        return None
-    except:
-        return None
-
-@st.cache_data(ttl=3600)
-def get_company_info(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        info = stock.info
-        
-        # Get additional key statistics
-        try:
-            market_stats = {
-                'Market Cap': info.get('marketCap', 'N/A'),
-                'Volume': info.get('volume', 'N/A'),
-                'P/E Ratio': info.get('trailingPE', 'N/A'),
-                '52 Week High': info.get('fiftyTwoWeekHigh', 'N/A'),
-                '52 Week Low': info.get('fiftyTwoWeekLow', 'N/A'),
-                'Beta': info.get('beta', 'N/A'),
-                'Dividend Yield': info.get('dividendYield', 'N/A'),
-                'Profit Margin': info.get('profitMargins', 'N/A'),
-            }
-            
-            # Format the values
-            for key, value in market_stats.items():
-                if value != 'N/A':
-                    if key == 'Market Cap':
-                        value = f"${value:,.0f}" if value >= 1e9 else f"${value/1e6:.2f}M"
-                    elif key == 'Volume':
-                        value = f"{value:,.0f}"
-                    elif key in ['P/E Ratio', 'Beta']:
-                        value = f"{value:.2f}"
-                    elif key in ['52 Week High', '52 Week Low']:
-                        value = f"${value:.2f}"
-                    elif key in ['Dividend Yield', 'Profit Margin']:
-                        value = f"{value*100:.2f}%" if value is not None else 'N/A'
-                market_stats[key] = value
-                
-            info.update(market_stats)
-        except Exception as e:
-            st.warning(f"Some market statistics may be unavailable: {str(e)}")
-            
-        return info
-    except Exception as e:
-        st.error(f"Error fetching company information: {str(e)}")
-        return None
-
-def display_company_logo(symbol):
-    """Display company logo if available"""
-    try:
-        # Try to get logo from different sources
-        logo_url = None
-        
-        # Try Wikipedia logo first
-        try:
-            response = requests.get(f"https://logo.clearbit.com/{symbol.lower()}.com")
-            if response.status_code == 200:
-                logo_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
-        except:
-            pass
-        
-        # Try Clearbit as backup
-        if not logo_url:
-            try:
-                ticker = yf.Ticker(symbol)
-                info = ticker.info
-                website = info.get('website', '')
-                if website:
-                    domain = website.replace('http://', '').replace('https://', '').split('/')[0]
-                    logo_url = f"https://logo.clearbit.com/{domain}"
-            except:
-                pass
-        
-        # Display logo if found
-        if logo_url:
-            try:
-                response = requests.get(logo_url)
-                if response.status_code == 200:
-                    image = Image.open(BytesIO(response.content))
-                    st.image(image, width=100)
-                    return True
-            except:
-                pass
-        
-        return False
-    except Exception as e:
-        print(f"Error displaying logo: {str(e)}")
-        return False
-
-# Initialize services
-def get_services():
-    """Initialize all services"""
-    technical_analysis = TechnicalAnalysisService()
-    prediction_service = PredictionService()
-    
-    return technical_analysis, prediction_service
 
 # Sidebar
 with st.sidebar:
