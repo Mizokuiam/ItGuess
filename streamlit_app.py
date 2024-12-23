@@ -34,39 +34,59 @@ st.markdown("""
         --border-color: #e0e0e0;
         --hover-color: #f0f0f0;
         --link-color: #1e88e5;
-        --sidebar-color: #ffffff;
+        --sidebar-color: #f8f9fa;
         --sidebar-text: #333333;
+        --slider-color: #1e88e5;
     }
     
     /* Dark mode styles */
     .dark {
         --text-color: #e0e0e0;
-        --background-color: #1a1a1a;
-        --card-background: #2d2d2d;
-        --border-color: #404040;
-        --hover-color: #3d3d3d;
+        --background-color: #0e1117;
+        --card-background: #1e2127;
+        --border-color: #2e3137;
+        --hover-color: #2e3137;
         --link-color: #64b5f6;
-        --sidebar-color: #262626;
+        --sidebar-color: #0e1117;
         --sidebar-text: #e0e0e0;
+        --slider-color: #64b5f6;
     }
     
     /* Apply theme */
+    .stApp {
+        background-color: var(--background-color);
+    }
+    
     .main {
         color: var(--text-color);
         background-color: var(--background-color);
     }
     
+    /* Sidebar styling */
     .stSidebar {
-        background-color: var(--sidebar-color);
-        color: var(--sidebar-text);
+        background-color: var(--sidebar-color) !important;
     }
     
     .stSidebar [data-testid="stMarkdownContainer"] {
         color: var(--sidebar-text);
     }
     
-    .stSidebar [data-testid="stSelectbox"] {
-        color: var(--sidebar-text);
+    .stSidebar [data-testid="stSelectbox"] label {
+        color: var(--sidebar-text) !important;
+    }
+    
+    .stSidebar [data-testid="stSelectbox"] > div > div {
+        background-color: var(--card-background) !important;
+        color: var(--text-color) !important;
+    }
+    
+    /* Slider styling */
+    .stSlider [data-testid="stThumbValue"] {
+        color: var(--text-color) !important;
+    }
+    
+    .stSlider [data-testid="stTickBar"] > div {
+        background-color: var(--slider-color) !important;
     }
     
     /* Style adjustments for dark mode compatibility */
@@ -75,16 +95,34 @@ st.markdown("""
     }
     
     .stTabs [data-baseweb="tab"] {
-        color: var(--text-color);
+        color: var(--text-color) !important;
     }
     
     .stTabs [data-baseweb="tab-list"] {
         background-color: var(--card-background);
     }
     
+    .stTabs [data-baseweb="tab-border"] {
+        background-color: var(--border-color);
+    }
+    
+    /* Input fields */
+    .stTextInput > div > div {
+        background-color: var(--card-background);
+        color: var(--text-color);
+    }
+    
+    .stTextInput > label {
+        color: var(--text-color) !important;
+    }
+    
     /* Metrics and other components */
     [data-testid="stMetricValue"] {
-        color: var(--text-color);
+        color: var(--text-color) !important;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: var(--text-color) !important;
     }
     
     .stPlotlyChart {
@@ -98,15 +136,35 @@ st.markdown("""
     
     .app-title {
         color: var(--text-color) !important;
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 3em;
+        font-weight: 700;
+        text-align: center;
+        margin: 20px 0;
     }
     
     .app-subtitle {
         color: var(--text-color) !important;
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 1.2em;
+        text-align: center;
+        margin-bottom: 30px;
+        opacity: 0.9;
     }
     
-    /* Apply theme class based on selection */
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        color: var(--text-color) !important;
+        background-color: var(--card-background) !important;
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none;}
+    
     </style>
-""")
+""", unsafe_allow_html=True)
 
 # Apply theme class based on selection
 if st.session_state.theme_selector == 'Dark':
@@ -114,13 +172,14 @@ if st.session_state.theme_selector == 'Dark':
         <style>
         :root {
             --text-color: #e0e0e0;
-            --background-color: #1a1a1a;
-            --card-background: #2d2d2d;
-            --border-color: #404040;
-            --hover-color: #3d3d3d;
+            --background-color: #0e1117;
+            --card-background: #1e2127;
+            --border-color: #2e3137;
+            --hover-color: #2e3137;
             --link-color: #64b5f6;
-            --sidebar-color: #262626;
+            --sidebar-color: #0e1117;
             --sidebar-text: #e0e0e0;
+            --slider-color: #64b5f6;
         }
         </style>
     ''', unsafe_allow_html=True)
@@ -134,8 +193,9 @@ else:
             --border-color: #e0e0e0;
             --hover-color: #f0f0f0;
             --link-color: #1e88e5;
-            --sidebar-color: #ffffff;
+            --sidebar-color: #f8f9fa;
             --sidebar-text: #333333;
+            --slider-color: #1e88e5;
         }
         </style>
     ''', unsafe_allow_html=True)
