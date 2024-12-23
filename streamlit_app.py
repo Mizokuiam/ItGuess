@@ -38,6 +38,45 @@ st.markdown("""
         opacity: 0.9;
     }
     
+    /* Feature cards styling */
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem;
+        margin: 2rem auto;
+    }
+    
+    .feature-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .feature-icon {
+        font-size: 2.5em;
+        margin-bottom: 1rem;
+    }
+    
+    .feature-title {
+        font-size: 1.2em;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .feature-description {
+        font-size: 0.9em;
+        opacity: 0.8;
+        line-height: 1.5;
+    }
+    
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -223,9 +262,17 @@ if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol i
     
     # Feature cards
     st.markdown("""
-        <div class="features-container">
+        <div class="features-grid">
             <div class="feature-card">
-                <span class="feature-icon">🎯</span>
+                <span class="feature-icon">📊</span>
+                <h3 class="feature-title">Stock Information and Analysis</h3>
+                <p class="feature-description">
+                    Get comprehensive stock information, company details, and key metrics for informed decision-making.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <span class="feature-icon">📈</span>
                 <h3 class="feature-title">Technical Analysis</h3>
                 <p class="feature-description">
                     Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.
@@ -233,18 +280,18 @@ if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol i
             </div>
             
             <div class="feature-card">
-                <span class="feature-icon">📈</span>
+                <span class="feature-icon">🔮</span>
                 <h3 class="feature-title">Price Prediction</h3>
                 <p class="feature-description">
-                    AI-powered price predictions based on technical analysis and market patterns.
+                    AI-powered price predictions using machine learning models to forecast future stock movements.
                 </p>
             </div>
             
             <div class="feature-card">
-                <span class="feature-icon">📊</span>
-                <h3 class="feature-title">Live Charts</h3>
+                <span class="feature-icon">📉</span>
+                <h3 class="feature-title">Live Chart Analysis</h3>
                 <p class="feature-description">
-                    Real-time interactive charts with customizable indicators and time periods.
+                    Real-time interactive charts with customizable timeframes and technical indicators.
                 </p>
             </div>
         </div>
