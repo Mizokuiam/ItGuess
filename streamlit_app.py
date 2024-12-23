@@ -41,57 +41,60 @@ st.markdown("""
     /* Feature cards styling */
     .features-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 2rem;
-        padding: 2rem;
-        max-width: 1200px;
-        margin: 2rem auto;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem;
     }
     
     .feature-card {
-        background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding: 2rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 1.5rem;
         text-align: center;
-        transition: all 0.3s ease;
+        transition: transform 0.3s ease;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 250px;
     }
     
     .feature-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        border-color: rgba(255, 75, 75, 0.5);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     }
     
     .feature-icon {
-        font-size: 3em;
-        margin-bottom: 1.5rem;
-        display: block;
-        background: linear-gradient(135deg, #FF4B4B, #FF8080);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
     }
     
     .feature-title {
-        font-size: 1.4em;
-        font-weight: 600;
-        margin: 0.5rem 0;
-        color: inherit;
+        color: #ff4b4b;
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
     }
     
     .feature-description {
-        font-size: 1em;
-        opacity: 0.85;
-        line-height: 1.6;
-        margin: 0;
-        color: inherit;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.5;
+    }
+    
+    /* Dark mode adjustments */
+    @media (prefers-color-scheme: dark) {
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .feature-description {
+            color: rgba(255, 255, 255, 0.8);
+        }
+    }
+    
+    /* Light mode adjustments */
+    @media (prefers-color-scheme: light) {
+        .feature-card {
+            background: rgba(0, 0, 0, 0.02);
+        }
+        .feature-description {
+            color: rgba(0, 0, 0, 0.8);
+        }
     }
     
     /* Hide Streamlit branding */
@@ -123,8 +126,8 @@ if 'services' not in st.session_state:
     st.session_state.services = get_services()
 
 # Display app title and subtitle
-st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
-st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
+st.title('ItGuess')
+st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
 
 # Search box centered
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -134,45 +137,52 @@ with col2:
 # Main content
 if not symbol:
     # Create columns for better spacing
-    st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    # Feature cards container
-    feature_cards = """
-    <div class="features-grid">
-        <div class="feature-card">
-            <div class="feature-icon">📊</div>
-            <h3 class="feature-title">Stock Information</h3>
-            <p class="feature-description">
-                Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
-            </p>
-        </div>
+    # Feature cards using columns
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3 class="feature-title">Stock Information</h3>
+                <p class="feature-description">
+                    Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        <div class="feature-card">
-            <div class="feature-icon">📈</div>
-            <h3 class="feature-title">Technical Analysis</h3>
-            <p class="feature-description">
-                Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
-            </p>
-        </div>
+        st.markdown("""
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3 class="feature-title">Technical Analysis</h3>
+                <p class="feature-description">
+                    Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+            <div class="feature-card">
+                <div class="feature-icon">🔮</div>
+                <h3 class="feature-title">Price Prediction</h3>
+                <p class="feature-description">
+                    AI-powered forecasting using machine learning to predict future stock price movements and trends.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        <div class="feature-card">
-            <div class="feature-icon">🔮</div>
-            <h3 class="feature-title">Price Prediction</h3>
-            <p class="feature-description">
-                AI-powered forecasting using machine learning to predict future stock price movements and trends.
-            </p>
-        </div>
-        
-        <div class="feature-card">
-            <div class="feature-icon">📉</div>
-            <h3 class="feature-title">Live Charts</h3>
-            <p class="feature-description">
-                Interactive real-time charts with customizable timeframes and technical overlay indicators.
-            </p>
-        </div>
-    </div>
-    """
-    st.markdown(feature_cards, unsafe_allow_html=True)
+        st.markdown("""
+            <div class="feature-card">
+                <div class="feature-icon">📉</div>
+                <h3 class="feature-title">Live Charts</h3>
+                <p class="feature-description">
+                    Interactive real-time charts with customizable timeframes and technical overlay indicators.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
 
 elif symbol:  # Show stock analysis when symbol is entered
     try:
