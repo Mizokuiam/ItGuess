@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for basic styling (keeping only essential styles)
+# Custom CSS for basic styling
 st.markdown("""
 <style>
     .app-title {
@@ -41,46 +41,76 @@ st.markdown("""
     /* Feature cards styling */
     .features-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        padding: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+        padding: 2rem;
+        max-width: 1200px;
         margin: 2rem auto;
     }
     
     .feature-card {
         background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        padding: 1.5rem;
+        border-radius: 15px;
+        padding: 2rem;
         text-align: center;
-        transition: transform 0.3s ease;
+        transition: all 0.3s ease;
         border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 250px;
     }
     
     .feature-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        border-color: rgba(255, 75, 75, 0.5);
     }
     
     .feature-icon {
-        font-size: 2.5em;
-        margin-bottom: 1rem;
+        font-size: 3em;
+        margin-bottom: 1.5rem;
+        display: block;
+        background: linear-gradient(135deg, #FF4B4B, #FF8080);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
     }
     
     .feature-title {
-        font-size: 1.2em;
+        font-size: 1.4em;
         font-weight: 600;
-        margin-bottom: 0.5rem;
+        margin: 0.5rem 0;
+        color: inherit;
     }
     
     .feature-description {
-        font-size: 0.9em;
-        opacity: 0.8;
-        line-height: 1.5;
+        font-size: 1em;
+        opacity: 0.85;
+        line-height: 1.6;
+        margin: 0;
+        color: inherit;
     }
     
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display: none;}
+    
+    /* Input field styling */
+    .stTextInput > div > div {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.5rem 1rem;
+    }
+    
+    .stTextInput > div > div:focus-within {
+        border-color: #FF4B4B;
+        box-shadow: 0 0 0 1px #FF4B4B;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -264,34 +294,34 @@ if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol i
     st.markdown("""
         <div class="features-grid">
             <div class="feature-card">
-                <span class="feature-icon">📊</span>
-                <h3 class="feature-title">Stock Information and Analysis</h3>
+                <div class="feature-icon">📊</div>
+                <h3 class="feature-title">Stock Information</h3>
                 <p class="feature-description">
-                    Get comprehensive stock information, company details, and key metrics for informed decision-making.
+                    Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
                 </p>
             </div>
             
             <div class="feature-card">
-                <span class="feature-icon">📈</span>
+                <div class="feature-icon">📈</div>
                 <h3 class="feature-title">Technical Analysis</h3>
                 <p class="feature-description">
-                    Advanced technical indicators including RSI, MACD, and Bollinger Bands for precise market analysis.
+                    Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
                 </p>
             </div>
             
             <div class="feature-card">
-                <span class="feature-icon">🔮</span>
+                <div class="feature-icon">🔮</div>
                 <h3 class="feature-title">Price Prediction</h3>
                 <p class="feature-description">
-                    AI-powered price predictions using machine learning models to forecast future stock movements.
+                    AI-powered forecasting using machine learning to predict future stock price movements and trends.
                 </p>
             </div>
             
             <div class="feature-card">
-                <span class="feature-icon">📉</span>
-                <h3 class="feature-title">Live Chart Analysis</h3>
+                <div class="feature-icon">📉</div>
+                <h3 class="feature-title">Live Charts</h3>
                 <p class="feature-description">
-                    Real-time interactive charts with customizable timeframes and technical indicators.
+                    Interactive real-time charts with customizable timeframes and technical overlay indicators.
                 </p>
             </div>
         </div>
