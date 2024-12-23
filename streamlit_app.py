@@ -16,8 +16,7 @@ st.set_page_config(
     page_title="ItGuess - Smart Stock Analysis",
     page_icon="",
     layout="wide",
-    initial_sidebar_state="expanded",
-    theme="dark"
+    initial_sidebar_state="expanded"
 )
 
 # Custom CSS for basic styling (keeping only essential styles)
