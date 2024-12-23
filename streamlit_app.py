@@ -14,175 +14,131 @@ from services.prediction import PredictionService
 # Configure Streamlit theme
 st.set_page_config(
     page_title="ItGuess - Smart Stock Analysis",
-    page_icon="📈",
-    layout="wide"
+    page_icon="",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
+# Theme selector in sidebar
+with st.sidebar:
+    theme = st.selectbox('Choose Theme', ['Light', 'Dark'], key='theme_selector')
+    
 # Custom CSS for light/dark mode compatibility
 st.markdown("""
 <style>
     /* Light mode styles */
-    [data-theme="light"] {
+    .light {
         --text-color: #333333;
         --background-color: #ffffff;
         --card-background: #f8f9fa;
         --border-color: #e0e0e0;
         --hover-color: #f0f0f0;
         --link-color: #1e88e5;
-        --gradient-start: #2196f3;
-        --gradient-mid: #00bcd4;
-        --gradient-end: #1976d2;
+        --sidebar-color: #ffffff;
+        --sidebar-text: #333333;
     }
     
     /* Dark mode styles */
-    [data-theme="dark"] {
+    .dark {
         --text-color: #e0e0e0;
         --background-color: #1a1a1a;
         --card-background: #2d2d2d;
         --border-color: #404040;
         --hover-color: #3d3d3d;
         --link-color: #64b5f6;
-        --gradient-start: #64b5f6;
-        --gradient-mid: #4fc3f7;
-        --gradient-end: #2196f3;
+        --sidebar-color: #262626;
+        --sidebar-text: #e0e0e0;
     }
     
-    /* Common styles */
-    .stApp {
+    /* Apply theme */
+    .main {
         color: var(--text-color);
         background-color: var(--background-color);
     }
     
-    .app-title {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 5em;
-        font-weight: 900;
-        text-align: center;
-        margin: 40px 0 20px;
+    .stSidebar {
+        background-color: var(--sidebar-color);
+        color: var(--sidebar-text);
+    }
+    
+    .stSidebar [data-testid="stMarkdownContainer"] {
+        color: var(--sidebar-text);
+    }
+    
+    .stSidebar [data-testid="stSelectbox"] {
+        color: var(--sidebar-text);
+    }
+    
+    /* Style adjustments for dark mode compatibility */
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: var(--background-color);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
         color: var(--text-color);
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.15);
-        letter-spacing: 4px;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: var(--card-background);
+    }
+    
+    /* Metrics and other components */
+    [data-testid="stMetricValue"] {
+        color: var(--text-color);
+    }
+    
+    .stPlotlyChart {
+        background-color: var(--card-background);
+    }
+    
+    /* Headers and text */
+    h1, h2, h3, h4, h5, h6, p {
+        color: var(--text-color) !important;
+    }
+    
+    .app-title {
+        color: var(--text-color) !important;
     }
     
     .app-subtitle {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 1.4em;
-        text-align: center;
-        color: var(--text-color);
-        margin-bottom: 40px;
-        opacity: 0.9;
-        font-weight: 500;
+        color: var(--text-color) !important;
     }
     
-    /* Typing animation */
-    @keyframes typing {
-        from { width: 0 }
-        to { width: 100% }
-    }
-    
-    @keyframes blink {
-        50% { border-color: transparent }
-    }
-    
-    .typing-container {
-        display: flex;
-        justify-content: center;
-        margin: 30px 0;
-    }
-    
-    .typing-text {
-        font-family: 'Consolas', monospace;
-        font-size: 1.3em;
-        color: var(--text-color);
-        border-right: 3px solid var(--text-color);
-        white-space: nowrap;
-        overflow: hidden;
-        animation: 
-            typing 3.5s steps(40, end),
-            blink .75s step-end infinite;
-        margin: 0 auto;
-        max-width: fit-content;
-    }
-    
-    /* Feature cards with improved styling */
-    .features-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 30px;
-        padding: 20px;
-        max-width: 1400px;
-        margin: 30px auto;
-    }
-    
-    .feature-card {
-        background: var(--card-background);
-        border-radius: 15px;
-        padding: 30px;
-        text-align: left;
-        transition: all 0.3s ease;
-        border: 2px solid var(--border-color);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-        border-color: var(--gradient-start);
-    }
-    
-    .feature-icon {
-        font-size: 2.5em;
-        margin-bottom: 15px;
-        display: inline-block;
-    }
-    
-    .feature-title {
-        font-size: 1.4em;
-        font-weight: 600;
-        margin: 10px 0;
-        color: var(--text-color);
-    }
-    
-    .feature-description {
-        color: var(--text-color);
-        line-height: 1.6;
-        font-size: 1em;
-        opacity: 0.9;
-    }
-    
-    /* Search box with improved styling */
-    .search-container {
-        display: flex;
-        justify-content: center;
-        margin: 30px 0;
-    }
-    
-    .search-text {
-        font-size: 1.2em;
-        color: var(--text-color);
-        margin: 0;
-    }
-    
-    .search-prompt {
-        text-align: center;
-        padding: 30px;
-        margin: 20px 0;
-        background: linear-gradient(145deg, var(--card-background), var(--hover-color));
-        border-radius: 15px;
-        border: 1px solid var(--border-color);
-    }
-    
-    /* Hide Streamlit default elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stDeployButton {display: none;}
-    
-    /* Hide any code elements */
-    .element-container:has(pre) {display: none;}
-    pre {display: none !important;}
-    code {display: none !important;}
-</style>
-""", unsafe_allow_html=True)
+    /* Apply theme class based on selection */
+    </style>
+""")
+
+# Apply theme class based on selection
+if st.session_state.theme_selector == 'Dark':
+    st.markdown('''
+        <style>
+        :root {
+            --text-color: #e0e0e0;
+            --background-color: #1a1a1a;
+            --card-background: #2d2d2d;
+            --border-color: #404040;
+            --hover-color: #3d3d3d;
+            --link-color: #64b5f6;
+            --sidebar-color: #262626;
+            --sidebar-text: #e0e0e0;
+        }
+        </style>
+    ''', unsafe_allow_html=True)
+else:
+    st.markdown('''
+        <style>
+        :root {
+            --text-color: #333333;
+            --background-color: #ffffff;
+            --card-background: #f8f9fa;
+            --border-color: #e0e0e0;
+            --hover-color: #f0f0f0;
+            --link-color: #1e88e5;
+            --sidebar-color: #ffffff;
+            --sidebar-text: #333333;
+        }
+        </style>
+    ''', unsafe_allow_html=True)
 
 # Initialize session state for symbol tracking
 if 'last_symbol' not in st.session_state:
@@ -323,21 +279,6 @@ with st.sidebar:
     st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
     st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
     
-    # Theme selector
-    if 'theme' not in st.session_state:
-        st.session_state.theme = 'Light'
-    
-    theme = st.selectbox(
-        'Choose Theme',
-        ['Light', 'Dark'],
-        key='theme_select',
-        index=['Light', 'Dark'].index(st.session_state.theme)
-    )
-    
-    if theme != st.session_state.theme:
-        st.session_state.theme = theme
-        set_theme(theme.lower())
-    
     # Search box with improved styling
     st.markdown("<div class='search-container'>", unsafe_allow_html=True)
     symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
@@ -426,7 +367,7 @@ elif symbol:  # Show stock analysis when symbol is entered
         with col1:
             if not display_company_logo(symbol):
                 # If logo not found, display a placeholder
-                st.markdown("📈")
+                st.markdown("")
                 
         with col2:
             if company_info:
