@@ -279,19 +279,22 @@ with st.sidebar:
 
 # Main content
 if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol is entered
-    # Title and subtitle
-    st.markdown('<h1 class="app-title">ItGuess</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
-    
-    # Search prompt with typing animation
-    st.markdown("""
-        <div class="typing-container">
-            <div class="typing-text">Enter a stock symbol to begin (e.g., AAPL for Apple Inc.)</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Feature cards
-    st.markdown("""
+    # Display app title and subtitle
+    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
+
+    # Search box
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
+
+    # Display feature cards when no symbol is entered
+    if not symbol:
+        # Create columns for better spacing
+        st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+        
+        # Feature cards container
+        feature_cards = """
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">📊</div>
@@ -325,7 +328,9 @@ if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol i
                 </p>
             </div>
         </div>
-    """, unsafe_allow_html=True)
+        """
+        st.markdown(feature_cards, unsafe_allow_html=True)
+
 elif symbol:  # Show stock analysis when symbol is entered
     try:
         # Validate symbol and get info
