@@ -116,220 +116,63 @@ st.markdown("""
 
 # Initialize session state for symbol tracking
 if 'last_symbol' not in st.session_state:
-    st.session_state.last_symbol = ''
-if 'last_update' not in st.session_state:
-    st.session_state.last_update = datetime.now()
-
-# Helper functions
-@st.cache_data(ttl=3600)
-def load_company_logo(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        if 'logo_url' in stock.info:
-            response = requests.get(stock.info['logo_url'])
-            img = Image.open(BytesIO(response.content))
-            return img
-        return None
-    except:
-        return None
-
-@st.cache_data(ttl=3600)
-def get_company_info(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        info = stock.info
-        
-        # Get additional key statistics
-        try:
-            market_stats = {
-                'Market Cap': info.get('marketCap', 'N/A'),
-                'Volume': info.get('volume', 'N/A'),
-                'P/E Ratio': info.get('trailingPE', 'N/A'),
-                '52 Week High': info.get('fiftyTwoWeekHigh', 'N/A'),
-                '52 Week Low': info.get('fiftyTwoWeekLow', 'N/A'),
-                'Beta': info.get('beta', 'N/A'),
-                'Dividend Yield': info.get('dividendYield', 'N/A'),
-                'Profit Margin': info.get('profitMargins', 'N/A'),
-            }
-            
-            # Format the values
-            for key, value in market_stats.items():
-                if value != 'N/A':
-                    if key == 'Market Cap':
-                        value = f"${value:,.0f}" if value >= 1e9 else f"${value/1e6:.2f}M"
-                    elif key == 'Volume':
-                        value = f"{value:,.0f}"
-                    elif key in ['P/E Ratio', 'Beta']:
-                        value = f"{value:.2f}"
-                    elif key in ['52 Week High', '52 Week Low']:
-                        value = f"${value:.2f}"
-                    elif key in ['Dividend Yield', 'Profit Margin']:
-                        value = f"{value*100:.2f}%" if value is not None else 'N/A'
-                market_stats[key] = value
-                
-            info.update(market_stats)
-        except Exception as e:
-            st.warning(f"Some market statistics may be unavailable: {str(e)}")
-            
-        return info
-    except Exception as e:
-        st.error(f"Error fetching company information: {str(e)}")
-        return None
-
-def display_company_logo(symbol):
-    """Display company logo if available"""
-    try:
-        # Try to get logo from different sources
-        logo_url = None
-        
-        # Try Wikipedia logo first
-        try:
-            response = requests.get(f"https://logo.clearbit.com/{symbol.lower()}.com")
-            if response.status_code == 200:
-                logo_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
-        except:
-            pass
-        
-        # Try Clearbit as backup
-        if not logo_url:
-            try:
-                ticker = yf.Ticker(symbol)
-                info = ticker.info
-                website = info.get('website', '')
-                if website:
-                    domain = website.replace('http://', '').replace('https://', '').split('/')[0]
-                    logo_url = f"https://logo.clearbit.com/{domain}"
-            except:
-                pass
-        
-        # Display logo if found
-        if logo_url:
-            try:
-                response = requests.get(logo_url)
-                if response.status_code == 200:
-                    image = Image.open(BytesIO(response.content))
-                    st.image(image, width=100)
-                    return True
-            except:
-                pass
-        
-        return False
-    except Exception as e:
-        print(f"Error displaying logo: {str(e)}")
-        return False
+    st.session_state.last_symbol = None
 
 # Initialize services
-def get_services():
-    """Initialize all services"""
-    technical_analysis = TechnicalAnalysisService()
-    prediction_service = PredictionService()
-    
-    return technical_analysis, prediction_service
+if 'services' not in st.session_state:
+    st.session_state.services = get_services()
 
-# Initialize or refresh services
-current_time = datetime.now()
-if 'services' not in st.session_state or \
-   'last_service_refresh' not in st.session_state or \
-   (current_time - st.session_state.last_service_refresh).total_seconds() > 3600:  # Refresh every hour
-    print("\nRefreshing services...")
-    technical_analysis, prediction_service = get_services()
-    st.session_state.services = {
-        'technical_analysis': technical_analysis,
-        'prediction': prediction_service
-    }
-    st.session_state.last_service_refresh = current_time
-    st.session_state.last_update = current_time
+# Display app title and subtitle
+st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
+st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
 
-technical_analysis = st.session_state.services['technical_analysis']
-prediction_service = st.session_state.services['prediction']
-
-# Validate services
-if technical_analysis is None or prediction_service is None:
-    st.error("Error initializing services. Please refresh the page.")
-    st.stop()
-
-# Sidebar
-with st.sidebar:
-    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
-    
-    # Search box with improved styling
-    st.markdown("<div class='search-container'>", unsafe_allow_html=True)
+# Search box centered
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
     symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Analysis settings
-    with st.expander("Analysis Settings", expanded=True):
-        st.subheader("Technical Analysis Settings")
-        rsi_period = st.slider("RSI Period", 
-                             min_value=1, max_value=21, value=14,
-                             help="Relative Strength Index calculation period")
-        
-        ma_period = st.slider("Moving Average Period",
-                            min_value=1, max_value=50, value=20,
-                            help="Moving Average calculation period")
-    
-    # Auto-refresh settings
-    with st.expander("Refresh Settings"):
-        auto_refresh = st.checkbox("Auto-refresh data (5min)",
-                                 help="Automatically refresh data every 5 minutes")
-        if auto_refresh and (datetime.now() - st.session_state.last_update).seconds > 300:
-            st.session_state.last_update = datetime.now()
-            st.rerun()
 
 # Main content
-if not symbol or len(symbol.strip()) == 0:  # Show welcome page when no symbol is entered
-    # Display app title and subtitle
-    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
-
-    # Search box
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
-
-    # Display feature cards when no symbol is entered
-    if not symbol:
-        # Create columns for better spacing
-        st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-        
-        # Feature cards container
-        feature_cards = """
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <h3 class="feature-title">Stock Information</h3>
-                <p class="feature-description">
-                    Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">📈</div>
-                <h3 class="feature-title">Technical Analysis</h3>
-                <p class="feature-description">
-                    Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">🔮</div>
-                <h3 class="feature-title">Price Prediction</h3>
-                <p class="feature-description">
-                    AI-powered forecasting using machine learning to predict future stock price movements and trends.
-                </p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">📉</div>
-                <h3 class="feature-title">Live Charts</h3>
-                <p class="feature-description">
-                    Interactive real-time charts with customizable timeframes and technical overlay indicators.
-                </p>
-            </div>
+if not symbol:
+    # Create columns for better spacing
+    st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+    
+    # Feature cards container
+    feature_cards = """
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3 class="feature-title">Stock Information</h3>
+            <p class="feature-description">
+                Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
+            </p>
         </div>
-        """
-        st.markdown(feature_cards, unsafe_allow_html=True)
+        
+        <div class="feature-card">
+            <div class="feature-icon">📈</div>
+            <h3 class="feature-title">Technical Analysis</h3>
+            <p class="feature-description">
+                Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
+            </p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">🔮</div>
+            <h3 class="feature-title">Price Prediction</h3>
+            <p class="feature-description">
+                AI-powered forecasting using machine learning to predict future stock price movements and trends.
+            </p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon">📉</div>
+            <h3 class="feature-title">Live Charts</h3>
+            <p class="feature-description">
+                Interactive real-time charts with customizable timeframes and technical overlay indicators.
+            </p>
+        </div>
+    </div>
+    """
+    st.markdown(feature_cards, unsafe_allow_html=True)
 
 elif symbol:  # Show stock analysis when symbol is entered
     try:
@@ -853,3 +696,138 @@ elif symbol:  # Show stock analysis when symbol is entered
         st.error(f"Error fetching data: {str(e)}")
 else:
     st.info("Please enter a valid stock symbol. Example: AAPL for Apple Inc.")
+
+# Helper functions
+@st.cache_data(ttl=3600)
+def load_company_logo(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        if 'logo_url' in stock.info:
+            response = requests.get(stock.info['logo_url'])
+            img = Image.open(BytesIO(response.content))
+            return img
+        return None
+    except:
+        return None
+
+@st.cache_data(ttl=3600)
+def get_company_info(symbol):
+    try:
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        
+        # Get additional key statistics
+        try:
+            market_stats = {
+                'Market Cap': info.get('marketCap', 'N/A'),
+                'Volume': info.get('volume', 'N/A'),
+                'P/E Ratio': info.get('trailingPE', 'N/A'),
+                '52 Week High': info.get('fiftyTwoWeekHigh', 'N/A'),
+                '52 Week Low': info.get('fiftyTwoWeekLow', 'N/A'),
+                'Beta': info.get('beta', 'N/A'),
+                'Dividend Yield': info.get('dividendYield', 'N/A'),
+                'Profit Margin': info.get('profitMargins', 'N/A'),
+            }
+            
+            # Format the values
+            for key, value in market_stats.items():
+                if value != 'N/A':
+                    if key == 'Market Cap':
+                        value = f"${value:,.0f}" if value >= 1e9 else f"${value/1e6:.2f}M"
+                    elif key == 'Volume':
+                        value = f"{value:,.0f}"
+                    elif key in ['P/E Ratio', 'Beta']:
+                        value = f"{value:.2f}"
+                    elif key in ['52 Week High', '52 Week Low']:
+                        value = f"${value:.2f}"
+                    elif key in ['Dividend Yield', 'Profit Margin']:
+                        value = f"{value*100:.2f}%" if value is not None else 'N/A'
+                market_stats[key] = value
+                
+            info.update(market_stats)
+        except Exception as e:
+            st.warning(f"Some market statistics may be unavailable: {str(e)}")
+            
+        return info
+    except Exception as e:
+        st.error(f"Error fetching company information: {str(e)}")
+        return None
+
+def display_company_logo(symbol):
+    """Display company logo if available"""
+    try:
+        # Try to get logo from different sources
+        logo_url = None
+        
+        # Try Wikipedia logo first
+        try:
+            response = requests.get(f"https://logo.clearbit.com/{symbol.lower()}.com")
+            if response.status_code == 200:
+                logo_url = f"https://logo.clearbit.com/{symbol.lower()}.com"
+        except:
+            pass
+        
+        # Try Clearbit as backup
+        if not logo_url:
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                website = info.get('website', '')
+                if website:
+                    domain = website.replace('http://', '').replace('https://', '').split('/')[0]
+                    logo_url = f"https://logo.clearbit.com/{domain}"
+            except:
+                pass
+        
+        # Display logo if found
+        if logo_url:
+            try:
+                response = requests.get(logo_url)
+                if response.status_code == 200:
+                    image = Image.open(BytesIO(response.content))
+                    st.image(image, width=100)
+                    return True
+            except:
+                pass
+        
+        return False
+    except Exception as e:
+        print(f"Error displaying logo: {str(e)}")
+        return False
+
+# Initialize services
+def get_services():
+    """Initialize all services"""
+    technical_analysis = TechnicalAnalysisService()
+    prediction_service = PredictionService()
+    
+    return technical_analysis, prediction_service
+
+# Sidebar
+with st.sidebar:
+    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
+    
+    # Search box with improved styling
+    st.markdown("<div class='search-container'>", unsafe_allow_html=True)
+    # symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Analysis settings
+    with st.expander("Analysis Settings", expanded=True):
+        st.subheader("Technical Analysis Settings")
+        rsi_period = st.slider("RSI Period", 
+                             min_value=1, max_value=21, value=14,
+                             help="Relative Strength Index calculation period")
+        
+        ma_period = st.slider("Moving Average Period",
+                            min_value=1, max_value=50, value=20,
+                            help="Moving Average calculation period")
+    
+    # Auto-refresh settings
+    with st.expander("Refresh Settings"):
+        auto_refresh = st.checkbox("Auto-refresh data (5min)",
+                                 help="Automatically refresh data every 5 minutes")
+        if auto_refresh and (datetime.now() - st.session_state.last_update).seconds > 300:
+            st.session_state.last_update = datetime.now()
+            st.rerun()
