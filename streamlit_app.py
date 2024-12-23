@@ -22,20 +22,30 @@ st.set_page_config(
 # Custom CSS for basic styling
 st.markdown("""
 <style>
-    .app-title {
-        font-family: sans-serif;
-        font-size: 3em;
-        font-weight: 700;
+    /* Main title styling */
+    .main-title {
         text-align: center;
-        margin: 20px 0;
+        color: #ff4b4b;
+        font-size: 3.5rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        padding: 2rem 0;
     }
     
-    .app-subtitle {
-        font-family: sans-serif;
-        font-size: 1.2em;
+    .main-subtitle {
         text-align: center;
-        margin-bottom: 30px;
-        opacity: 0.9;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+    }
+    
+    /* Sidebar styling */
+    .sidebar-title {
+        color: #ff4b4b;
+        font-size: 2rem;
+        font-weight: bold;
+        text-align: center;
+        padding: 1rem 0;
     }
     
     /* Feature cards styling */
@@ -53,7 +63,6 @@ st.markdown("""
         text-align: center;
         transition: transform 0.3s ease;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        margin-bottom: 0.5rem;
     }
     
     .feature-card:hover {
@@ -99,31 +108,9 @@ st.markdown("""
         }
     }
     
-    /* Emoji styling */
-    .stMarkdown div[data-testid="stMarkdownContainer"] p {
-        font-size: 2.5rem;
-        text-align: center;
-        margin-top: -1rem;
-        margin-bottom: 1rem;
-    }
-    
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    .stDeployButton {display: none;}
-    
-    /* Input field styling */
-    .stTextInput > div > div {
-        background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 0.5rem 1rem;
-    }
-    
-    .stTextInput > div > div:focus-within {
-        border-color: #FF4B4B;
-        box-shadow: 0 0 0 1px #FF4B4B;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -239,9 +226,30 @@ if 'last_symbol' not in st.session_state:
 if 'services' not in st.session_state:
     st.session_state.services = get_services()
 
+# Sidebar
+with st.sidebar:
+    st.markdown('<h1 class="sidebar-title">ItGuess</h1>', unsafe_allow_html=True)
+    
+    # Analysis settings
+    with st.expander("Analysis Settings", expanded=True):
+        st.subheader("Technical Analysis Settings")
+        rsi_period = st.slider("RSI Period", 
+                             min_value=1, max_value=21, value=14,
+                             help="Relative Strength Index calculation period")
+        
+        ma_period = st.slider("Moving Average Period",
+                            min_value=1, max_value=50, value=20,
+                            help="Moving Average calculation period")
+    
+    # Auto-refresh settings
+    with st.expander("Refresh Settings"):
+        auto_refresh = st.checkbox("Auto-refresh data (5min)",
+                                 help="Automatically refresh data every 5 minutes")
+
+# Main content
 # Display app title and subtitle
-st.title('ItGuess')
-st.markdown('<p class="app-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">ItGuess</h1>', unsafe_allow_html=True)
+st.markdown('<p class="main-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
 
 # Search box centered
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -257,46 +265,43 @@ if not symbol:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("""
+        # Stock Information Card
+        st.markdown("""
             <div class="feature-card">
+                <div class="feature-icon">💹</div>
                 <div class="feature-title">Stock Information</div>
                 <div class="feature-description">
                     Comprehensive analysis of stock data, company details, and real-time market metrics for informed investment decisions.
                 </div>
             </div>
-        """, unsafe_allow_html=True)
-        st.write("💹")
-        
-        st.write("""
+            
             <div class="feature-card">
+                <div class="feature-icon">📊</div>
                 <div class="feature-title">Technical Analysis</div>
                 <div class="feature-description">
                     Advanced indicators including RSI, MACD, and Bollinger Bands for precise market trend analysis.
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        st.write("📊")
     
     with col2:
-        st.write("""
+        st.markdown("""
             <div class="feature-card">
+                <div class="feature-icon">🎯</div>
                 <div class="feature-title">Price Prediction</div>
                 <div class="feature-description">
                     AI-powered forecasting using machine learning to predict future stock price movements and trends.
                 </div>
             </div>
-        """, unsafe_allow_html=True)
-        st.write("🎯")
-        
-        st.write("""
+            
             <div class="feature-card">
+                <div class="feature-icon">📈</div>
                 <div class="feature-title">Live Charts</div>
                 <div class="feature-description">
                     Interactive real-time charts with customizable timeframes and technical overlay indicators.
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        st.write("📈")
 
 elif symbol:  # Show stock analysis when symbol is entered
     try:
@@ -820,32 +825,3 @@ elif symbol:  # Show stock analysis when symbol is entered
         st.error(f"Error fetching data: {str(e)}")
 else:
     st.info("Please enter a valid stock symbol. Example: AAPL for Apple Inc.")
-
-# Sidebar
-with st.sidebar:
-    st.markdown("<h1 class='app-title'>ItGuess</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='app-subtitle'>Smart Stock Analysis & Prediction</p>", unsafe_allow_html=True)
-    
-    # Search box with improved styling
-    st.markdown("<div class='search-container'>", unsafe_allow_html=True)
-    # symbol = st.text_input("Enter stock symbol", placeholder="e.g. AAPL, GOOGL, MSFT", key="symbol_input")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Analysis settings
-    with st.expander("Analysis Settings", expanded=True):
-        st.subheader("Technical Analysis Settings")
-        rsi_period = st.slider("RSI Period", 
-                             min_value=1, max_value=21, value=14,
-                             help="Relative Strength Index calculation period")
-        
-        ma_period = st.slider("Moving Average Period",
-                            min_value=1, max_value=50, value=20,
-                            help="Moving Average calculation period")
-    
-    # Auto-refresh settings
-    with st.expander("Refresh Settings"):
-        auto_refresh = st.checkbox("Auto-refresh data (5min)",
-                                 help="Automatically refresh data every 5 minutes")
-        if auto_refresh and (datetime.now() - st.session_state.last_update).seconds > 300:
-            st.session_state.last_update = datetime.now()
-            st.rerun()
