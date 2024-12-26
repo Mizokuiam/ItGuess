@@ -53,7 +53,6 @@ st.markdown("""
     }
 </style>
 
-<div class="main-title">ItGuess</div>
 """, unsafe_allow_html=True)
 
 # Helper functions
@@ -168,6 +167,12 @@ if 'last_symbol' not in st.session_state:
 if 'services' not in st.session_state:
     st.session_state.services = get_services()
 
+# Display app title and subtitle
+st.markdown("""
+<div class="main-title">ItGuess</div>
+<p style="text-align: center; font-size: 1.2rem; margin-bottom: 2rem;">Smart Stock Analysis & Prediction</p>
+""", unsafe_allow_html=True)
+
 # Sidebar
 with st.sidebar:
     st.markdown('<h1 class="sidebar-title">ItGuess</h1>', unsafe_allow_html=True)
@@ -189,12 +194,6 @@ with st.sidebar:
                                  help="Automatically refresh data every 5 minutes")
 
 # Main content
-# Display app title and subtitle
-st.markdown("""
-<div class="main-title">ItGuess</div>
-<p style="text-align: center; font-size: 1.2rem; margin-bottom: 2rem;">Smart Stock Analysis & Prediction</p>
-""", unsafe_allow_html=True)
-
 # Search box centered
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
@@ -256,30 +255,7 @@ elif symbol:  # Show stock analysis when symbol is entered
         if info is None:
             st.error(f"Could not find stock with symbol: {symbol}")
             st.stop()
-            
-        # Load company info and logo
-        with st.spinner("Loading company information..."):
-            company_info = get_company_info(symbol)
-            company_logo = load_company_logo(symbol)
-            
-            if not company_info:
-                st.warning("Could not load company information, but proceeding with analysis")
-                
-        # Main header with company info
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            if not display_company_logo(symbol):
-                # If logo not found, display a placeholder
-                st.markdown("")
-                
-        with col2:
-            if company_info:
-                st.markdown(f"<h1 class='gradient-text'>{company_info['longName']} ({symbol})</h1>", unsafe_allow_html=True)
-                st.markdown(f"<p class='company-meta'>{company_info['sector']} | {company_info['industry']}</p>", 
-                          unsafe_allow_html=True)
-            else:
-                st.markdown(f"<h1 class='gradient-text'>{symbol}</h1>", unsafe_allow_html=True)
-
+        
         # Create tabs with animation
         tab_names = ["Overview", "Technical Analysis", "Price Prediction", "Live Chart"]
         tabs = st.tabs(tab_names)
@@ -294,11 +270,9 @@ elif symbol:  # Show stock analysis when symbol is entered
                         
                     with col2:
                         if 'longName' in info:
-                            st.title(info['longName'])
-                        if 'symbol' in info:
-                            st.subheader(f"Symbol: {info['symbol']}")
+                            st.subheader(info['longName'])
                         if 'sector' in info and 'industry' in info:
-                            st.text(f"Sector: {info.get('sector', 'N/A')} | Industry: {info.get('industry', 'N/A')}")
+                            st.markdown(f"**Sector:** {info.get('sector', 'N/A')} | **Industry:** {info.get('industry', 'N/A')}")
                     
                     # Quick Stats
                     st.subheader("Quick Stats")
