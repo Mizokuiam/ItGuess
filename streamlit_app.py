@@ -37,100 +37,23 @@ st.markdown("""
         position: relative;
     }
     
-    /* Background styling */
+    /* Remove custom background */
     .stApp {
-        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-        background-attachment: fixed;
+        background: none !important;
     }
 
-    /* Make text more readable on dark background */
-    .stMarkdown, .stText {
-        color: #ffffff !important;
-    }
-
-    /* Style headers */
-    h1, h2, h3 {
-        color: #ffffff !important;
-    }
-
-    /* Style metrics */
+    /* Style metrics to be mode-compatible */
     [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-    }
-    
-    /* Sidebar styling */
-    .sidebar-title {
-        color: #ff4b4b;
-        font-size: 2rem;
-        font-weight: bold;
-        text-align: center;
-        padding: 1rem 0;
-    }
-    
-    /* Feature cards styling */
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        padding: 1rem;
-    }
-    
-    .feature-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        padding: 1.5rem;
-        text-align: center;
-        transition: transform 0.3s ease;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-    
-    .feature-icon {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    .feature-title {
-        color: #ff4b4b;
-        font-size: 1.25rem;
-        margin-bottom: 0.5rem;
         font-weight: bold;
     }
-    
-    .feature-description {
-        font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.8);
-        line-height: 1.5;
+
+    /* Ensure text is readable in both modes */
+    .stMarkdown {
+        font-family: 'Segoe UI', sans-serif;
     }
-    
-    /* Dark mode adjustments */
-    @media (prefers-color-scheme: dark) {
-        .feature-card {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .feature-description {
-            color: rgba(255, 255, 255, 0.8);
-        }
-    }
-    
-    /* Light mode adjustments */
-    @media (prefers-color-scheme: light) {
-        .feature-card {
-            background: rgba(0, 0, 0, 0.02);
-        }
-        .feature-description {
-            color: rgba(0, 0, 0, 0.8);
-        }
-    }
-    
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
 </style>
+
+<div class="main-title">ItGuess</div>
 """, unsafe_allow_html=True)
 
 # Helper functions
