@@ -25,18 +25,37 @@ st.markdown("""
     /* Main title styling */
     .main-title {
         text-align: center;
-        color: #ff4b4b;
-        font-size: 3.5rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-        padding: 2rem 0;
+        background: linear-gradient(120deg, #ff4b4b, #7928CA);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 4rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        font-family: 'Segoe UI', sans-serif;
+        padding: 1rem;
+        position: relative;
     }
     
-    .main-subtitle {
-        text-align: center;
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
+    /* Background styling */
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        background-attachment: fixed;
+    }
+
+    /* Make text more readable on dark background */
+    .stMarkdown, .stText {
+        color: #ffffff !important;
+    }
+
+    /* Style headers */
+    h1, h2, h3 {
+        color: #ffffff !important;
+    }
+
+    /* Style metrics */
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
     }
     
     /* Sidebar styling */
@@ -248,7 +267,7 @@ with st.sidebar:
 
 # Main content
 # Display app title and subtitle
-st.markdown('<h1 class="main-title">ItGuess</h1>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">ItGuess</div>', unsafe_allow_html=True)
 st.markdown('<p class="main-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
 
 # Search box centered
