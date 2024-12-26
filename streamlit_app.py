@@ -190,8 +190,10 @@ with st.sidebar:
 
 # Main content
 # Display app title and subtitle
-st.markdown('<div class="main-title">ItGuess</div>', unsafe_allow_html=True)
-st.markdown('<p class="main-subtitle">Smart Stock Analysis & Prediction</p>', unsafe_allow_html=True)
+st.markdown("""
+<div class="main-title">ItGuess</div>
+<p style="text-align: center; font-size: 1.2rem; margin-bottom: 2rem;">Smart Stock Analysis & Prediction</p>
+""", unsafe_allow_html=True)
 
 # Search box centered
 col1, col2, col3 = st.columns([1, 2, 1])
