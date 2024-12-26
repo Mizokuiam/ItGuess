@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 import requests
 from PIL import Image
 from io import BytesIO
+import time
 from services.technical_analysis import TechnicalAnalysisService
 from services.prediction import PredictionService
 
@@ -54,6 +55,30 @@ st.markdown("""
 </style>
 
 """, unsafe_allow_html=True)
+
+# Auto-refresh mechanism
+def auto_refresh():
+    # Only refresh if auto-refresh is enabled in session state
+    if 'auto_refresh' not in st.session_state:
+        st.session_state.auto_refresh = False
+        
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
+        
+    if st.session_state.auto_refresh:
+        current_time = time.time()
+        # Refresh every 5 minutes (300 seconds)
+        if current_time - st.session_state.last_refresh > 300:
+            st.session_state.last_refresh = current_time
+            st.cache_data.clear()
+            st.experimental_rerun()
+
+# Health check endpoint for UptimeRobot
+def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+# Run auto-refresh
+auto_refresh()
 
 # Helper functions
 @st.cache_data(ttl=3600)
@@ -176,6 +201,12 @@ st.markdown("""
 # Sidebar
 with st.sidebar:
     st.markdown('<h1 class="sidebar-title">ItGuess</h1>', unsafe_allow_html=True)
+    
+    # Add auto-refresh toggle in sidebar
+    st.markdown("### App Settings")
+    st.session_state.auto_refresh = st.toggle("Enable Auto-Refresh (5min)", 
+                                            value=st.session_state.get('auto_refresh', False),
+                                            help="Automatically refresh data every 5 minutes")
     
     # Analysis settings
     with st.expander("Analysis Settings", expanded=True):
